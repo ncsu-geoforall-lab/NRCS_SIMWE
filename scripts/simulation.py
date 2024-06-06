@@ -16,15 +16,16 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")
                 print(f"Project Name: {project_name}")
                 # Initialize the GRASS session
                 gs.setup.init(gisdb, project_name, "PERMANENT")
                 # Import the elevation raster
-                elevation_data = import_elevation(project_name, resolution)
+                elevation_data = "elevation"
+                import_elevation(project_name, resolution)
                 # Import the SSURGO MUKEY raster
                 import_ssurgo_mukey(project_name, resolution)
-                # download_naip(project_name)
+                download_naip(project_name)
                 simulate(project_name, elevation_data)
             except ValueError:
                 exit(1)
@@ -47,6 +48,8 @@ def simulate(project_name, elevation_data):
     calculate_geomorphon(elevation_data)
     # Calculate partial derivatives
     calculate_partial_derivites(elevation_data)
+    # Calculate hillshade
+    calculate_hillshade(elevation_data)
     # Run the SIMWE model
     simwe(elevation_data, "dx", "dy", "depth", "disch")
 
@@ -144,9 +147,21 @@ def calculate_partial_derivites(elevation, dx="dx", dy="dy", **kwargs):
 
     # Set the color tables
     gs.run_command("r.colors", map=aspect, color="aspectcolr")
-    gs.run_command("r.colors", map=slope, color="sepia")
+    gs.run_command("r.colors", map=slope, color="sepia", flags="e")
     gs.run_command("r.colors", map=pcurv, color="curvature")
     gs.run_command("r.colors", map=tcurv, color="curvature")
+
+
+def calculate_hillshade(elevation, hillshade="hillshade"):
+    """Calculate the hillshade"""
+    print("Calculating hillshade")
+    gs.run_command(
+        "r.relief",
+        input=elevation,
+        output=hillshade,
+        zscale=1,
+        overwrite=True,
+    )
 
 
 def simwe(elevation, dx, dy, depth, disch):
