@@ -2,3 +2,5 @@ requests
 matplotlib
 pandas
 ipywidgets
+pystac_client
+tqdm

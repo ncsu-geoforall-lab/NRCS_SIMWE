@@ -43,3 +43,31 @@ pip install -r requirements.txt
 # Run pre-commit install to setup the git hook scripts
 (venv) $ pre-commit install
 ```
+
+## Create Site Projects (Locations) in GRASS
+
+Run the python script `scripts/create_site_projects.py` to create site projects (locations) in GRASS GIS.
+
+```bash
+(venv) $ python scripts/create_site_projects.py
+```
+
+## Run SIMWE Model
+
+Run the python script `scripts/simulation.py` to downlaod data and run the SIMWE model.
+
+```bash
+(venv) $ python scripts/simulation.py
+```
+
+## License
+
+## Acknowledgements
+
+This project is supported by the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and North Carolina State University.
+
+## Contributors
+
+- Helena Mitasova (North Carolina State University)
+- Corey T. White (North Carolina State University)
+- Add your name here
