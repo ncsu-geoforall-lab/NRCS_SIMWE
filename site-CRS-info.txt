@@ -1,0 +1,5 @@
+clay-center:32614:3
+coweeta:26917:10
+SFREC:26910:1
+SJER:26911:1
+tx069-playas:32613:8
