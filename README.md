@@ -12,6 +12,49 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 - [ ] Expand model capabilities to include multiple and consecutive rainfall events and account for antecedent conditions.
 - [ ] Develop multilayer SIMWE model simulations that account for multiple subsurface soil layers.
 
+## Sites
+
+### Clay Center
+
+![claycenter3d](output/clay-center/elevation_3dmap.png)
+
+- [x] Create site projects in GRASS GIS
+
+Report: [output/clay-center/clay-center.md](output/clay-center/clay-center.md)
+
+
+### Coweeta
+
+![coweeta3d](output/coweeta/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+
+Report: [output/coweeta/report.md](output/clay-center/clay-center.md)
+
+### SFREC
+
+![sfrec3d](output/SFREC/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+
+Report: [output/SFREC/report.md](output/SFREC/report.md)
+
+### SJER
+
+![sjer3d](output/SJER/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+
+Report: [output/SJER/report.md](output/SJER/report.md)
+
+### tx069-playas
+
+![tx0693d](output/tx069-playas/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+
+Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
+
 ## Data
 
 ### Shared Goolge Drive
