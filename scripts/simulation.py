@@ -98,16 +98,18 @@ def import_ssurgo_mukey(project, resolution, output_name="ssurgo_mukey"):
     # Set the color table
     gs.run_command("r.colors", map=output_name, color="random")
 
+    # Doesn't work at the moment
+    ##############################
     # Import the soil vector data
-    url = f"{BASE_URL}{project}/vect/ssurgo.shp"
-    print("Downloading soil data from:", url)
-    # Import the vector into GRASS GIS
-    gs.run_command(
-        "v.in.ogr",
-        input=url,
-        output="soil",
-        overwrite=True,
-    )
+    # url = f"{BASE_URL}{project}/vect/ssurgo.shp"
+    # print("Downloading soil data from:", url)
+    # # Import the vector into GRASS GIS
+    # gs.run_command(
+    #     "v.in.ogr",
+    #     input=url,
+    #     output="soil",
+    #     overwrite=True,
+    # )
 
     # Return the output raster name
     return output_name
