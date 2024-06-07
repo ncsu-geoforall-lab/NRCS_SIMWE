@@ -48,8 +48,8 @@ def main():
         tcurv_fig_params = create_tcurv_fig(params, output_dir)
         overview_plot_params.append(tcurv_fig_params)
 
-        create_pcurv_fig_params = create_pcurv_fig(params, output_dir)
-        overview_plot_params.append(create_pcurv_fig_params)
+        pcurv_fig_params = create_pcurv_fig(params, output_dir)
+        overview_plot_params.append(pcurv_fig_params)
 
         naip_fig_params = create_naip_fig(params, output_dir)
         overview_plot_params.append(naip_fig_params)
@@ -63,7 +63,7 @@ def main():
     output_fig = os.path.join(OUTPUT_DIR, "sites_elevation_fig3.png")
     generate_plots(5, 10, overview_plot_params, output_fig)
 
-    create_model_run("basic", "depth", True)
+    # create_model_run("basic", "depth", True)
     create_model_run("basic", "disch")
 
 
@@ -148,7 +148,7 @@ def create_pcurv_fig(site_params, output_dir):
     site = site_params["site"]
     res = site_params["res"]
     map_name = "Planform curvature"
-    out_file = os.path.join(output_dir, "tcurv.png")
+    out_file = os.path.join(output_dir, "pcurv.png")
     dem_map = gj.Map(use_region=True, height=600, width=600, filename=out_file)
     dem_map.d_shade(color="pcurv", shade="hillshade")
     dem_map.d_legend(raster="pcurv", at=(5, 50, 5, 9), flags="b")
