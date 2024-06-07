@@ -29,7 +29,7 @@ Report: [output/clay-center/clay-center.md](output/clay-center/clay-center.md)
 
 - [X] Create site projects in GRASS GIS
 
-Report: [output/coweeta/report.md](output/clay-center/clay-center.md)
+Report: [output/coweeta/report.md](output/coweeta/coweeta.md)
 
 ### SFREC
 
