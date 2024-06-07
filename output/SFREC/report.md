@@ -4,6 +4,8 @@
 
 ### First order topographic data
 
+> Possible tiling or interpolation artifacts are present in the DEM.
+
 * 1m DEM
 * Unit of measure: meters
 * EPSG: 26910

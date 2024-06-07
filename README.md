@@ -55,6 +55,10 @@ Report: [output/SJER/report.md](output/SJER/report.md)
 
 Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
 
+## Basic Model Simulations Comparison
+
+![basic_simwe](notebooks/output/depth_fig.png)
+
 ## Data
 
 ### Shared Goolge Drive
