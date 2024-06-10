@@ -20,7 +20,7 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 
 - [x] Create site projects in GRASS GIS
 
-Report: [output/clay-center/clay-center.md](output/clay-center/clay-center.md)
+Report: [output/clay-center/report.md](output/clay-center/report.md)
 
 
 ### Coweeta
