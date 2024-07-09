@@ -4,3 +4,5 @@ pandas
 ipywidgets
 pystac_client
 tqdm
+ipyleaflet
+folium
