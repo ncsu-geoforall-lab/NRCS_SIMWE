@@ -19,6 +19,7 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 ![claycenter3d](output/clay-center/elevation_3dmap.png)
 
 - [x] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
 
 Report: [output/clay-center/report.md](output/clay-center/report.md)
 
@@ -28,6 +29,7 @@ Report: [output/clay-center/report.md](output/clay-center/report.md)
 ![coweeta3d](output/coweeta/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
 
 Report: [output/coweeta/report.md](output/coweeta/report.md)
 
@@ -36,6 +38,7 @@ Report: [output/coweeta/report.md](output/coweeta/report.md)
 ![sfrec3d](output/SFREC/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
 
 Report: [output/SFREC/report.md](output/SFREC/report.md)
 
@@ -44,6 +47,7 @@ Report: [output/SFREC/report.md](output/SFREC/report.md)
 ![sjer3d](output/SJER/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
 
 Report: [output/SJER/report.md](output/SJER/report.md)
 
@@ -52,6 +56,7 @@ Report: [output/SJER/report.md](output/SJER/report.md)
 ![tx0693d](output/tx069-playas/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
 
 Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
 
