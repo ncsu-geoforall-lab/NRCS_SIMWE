@@ -6,7 +6,7 @@ import subprocess
 
 
 BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
-PROJECT_MAPSET = "basic"
+PROJECT_MAPSET = "basic60"
 
 
 # Define main function
@@ -19,23 +19,12 @@ def main():
                 project_name, projcrs, resolution, naip = line.split(":")
                 print(f"Project Name: {project_name}")
                 # Initialize the GRASS session
-                gs.setup.init(gisdb, project_name, "PERMANENT")
+                gs.setup.init(gisdb, project_name, PROJECT_MAPSET)
                 # Import the elevation raster
                 elevation_data = "elevation"
-                import_elevation(project_name, resolution)
-                # Import the SSURGO MUKEY raster
-                import_ssurgo_mukey(project_name, resolution)
-                download_naip(project_name)
                 simulate(project_name, elevation_data)
             except ValueError:
                 exit(1)
-
-
-# def calculate_geomorphology(elevation_data):
-#     """Calculate geomorphological features"""
-#     # Calculate the geomorphon
-#     calculate_geomorphon(elevation_data)
-#     calculate_partial_derivites(elevation_data)
 
 
 def simulate(project_name, elevation_data):
@@ -44,87 +33,11 @@ def simulate(project_name, elevation_data):
     gs.run_command("g.mapset", mapset=PROJECT_MAPSET, flags="c")
     # Set region
     gs.run_command("g.region", raster=elevation_data, flags="ap")
-    # Calculate geomorphological features
-    calculate_geomorphon(elevation_data)
     # Calculate partial derivatives
     calculate_partial_derivites(elevation_data)
-    # Calculate hillshade
-    calculate_hillshade(elevation_data)
     # Run the SIMWE model
-    simwe(elevation_data, "dx", "dy", "depth", "disch")
-
-
-def import_elevation(project, resolution, output_name="elevation"):
-    # Download the data
-    url = f"{BASE_URL}{project}/grid/elev.tif"
-    print("Downloading elevation data from:", url)
-    # Import the raster into GRASS GIS
-    gs.run_command(
-        "r.import",
-        input=url,
-        output=output_name,
-        extent="input",
-        resolution="value",
-        resolution_value=resolution,
-        resample="bicubic",
-        title="Elevation",
-        overwrite=True,
-    )
-
-    # Set the color table
-    gs.run_command("r.colors", map=output_name, color="elevation")
-
-    # Return the output raster name
-    return output_name
-
-
-def import_ssurgo_mukey(project, resolution, output_name="ssurgo_mukey"):
-    # Download the data
-    url = f"{BASE_URL}{project}/grid/ssurgo-mukey.tif"
-    print("Downloading ssurgo-mukey data from:", url)
-    # Import the raster into GRASS GIS
-    gs.run_command(
-        "r.import",
-        input=url,
-        output=output_name,
-        extent="input",
-        resolution="value",
-        resolution_value=resolution,
-        resample="nearest",
-        title="Gridded Soil Survey Geographic (gSSURGO) Map Unit Key (MUKEY)",
-        overwrite=True,
-    )
-
-    # Set the color table
-    gs.run_command("r.colors", map=output_name, color="random")
-
-    # Doesn't work at the moment
-    ##############################
-    # Import the soil vector data
-    # url = f"{BASE_URL}{project}/vect/ssurgo.shp"
-    # print("Downloading soil data from:", url)
-    # # Import the vector into GRASS GIS
-    # gs.run_command(
-    #     "v.in.ogr",
-    #     input=url,
-    #     output="soil",
-    #     overwrite=True,
-    # )
-
-    # Return the output raster name
-    return output_name
-
-
-def calculate_geomorphon(elevation, geomorphon="geomorphon"):
-    """Calculate the geomorphon"""
-    print("Calculating geomorphon")
-    gs.run_command(
-        "r.geomorphon",
-        elevation=elevation,
-        forms=geomorphon,
-        search=3,
-        overwrite=True,
-    )
+    # simwe(elevation_data, "dx", "dy", "depth", "disch")
+    simwe(elevation_data, "dx", "dy", "depth", "disch", niterations=60)
 
 
 def calculate_partial_derivites(elevation, dx="dx", dy="dy", **kwargs):
@@ -154,21 +67,10 @@ def calculate_partial_derivites(elevation, dx="dx", dy="dy", **kwargs):
     gs.run_command("r.colors", map=tcurv, color="curvature")
 
 
-def calculate_hillshade(elevation, hillshade="hillshade"):
-    """Calculate the hillshade"""
-    print("Calculating hillshade")
-    gs.run_command(
-        "r.relief",
-        input=elevation,
-        output=hillshade,
-        zscale=1,
-        overwrite=True,
-    )
-
-
-def simwe(elevation, dx, dy, depth, disch):
+def simwe(elevation, dx, dy, depth, disch, **kwargs):
     """Run the SIMWE model"""
     print("Running the SIMWE model")
+    niterations = kwargs.get("niterations", 10)
     OUTPUT_STEP = 2  # minutes
     gs.run_command(
         "r.sim.water",
@@ -178,12 +80,12 @@ def simwe(elevation, dx, dy, depth, disch):
         rain_value=50,  # mm/hr
         infil_value=0.0,  # mm/hr
         man_value=0.1,
-        niterations=10,  # minutes
+        niterations=niterations,  # event duration (minutes)
         output_step=OUTPUT_STEP,  # minutes
         depth=depth,  # m
         discharge=disch,  # m3/s
         random_seed=3,
-        nprocs=4,
+        nprocs=30,
         flags="t",
         overwrite=True,
     )
@@ -216,55 +118,31 @@ def simwe(elevation, dx, dy, depth, disch):
         overwrite=True,
     )
 
-
-def download_naip(year=2022):
-    """Download the NAIP imagery"""
-    # Download the data
-    print("Downloading NAIP data")
-    # Create a new mapset to store raw naip data
-    gs.run_command("g.mapset", mapset="naip", flags="c")
-    # Import the raster into GRASS GIS
+    # Register the output maps into a space time dataset
     gs.run_command(
-        "t.stac.import",
+        "t.create",
+        output="disch_sum",
+        type="strds",
+        temporaltype="absolute",
+        title="Runoff Discharge",
+        description="Runoff Discharge in [m3/s]",
         overwrite=True,
-        url="https://planetarycomputer.microsoft.com/api/stac/v1",
-        request_method="POST",
-        collections="naip",
-        datetime=year,
-        asset_keys="image",
-        resolution="value",
-        resolution_value=1,
-        extent="region",
-        nprocs=10,
-        memory=36000,
     )
 
+    # Get the list of disch maps
+    disch_list = gs.read_command(
+        "g.list", type="raster", pattern="disch.*", separator="comma"
+    ).strip()
 
-def patch_and_composite_naip(year=2022):
-    gs.run_command("g.region", res=1)
-    naip_bands = [(1, "red"), (2, "green"), (3, "blue"), (4, "nir")]
-    for band in naip_bands:
-        i, band_name = band
-        # Get the list of depth maps
-        image_list = gs.read_command(
-            "g.list", type="raster", pattern=f"*.{i}", separator="comma"
-        ).strip()
-
-        gs.run_command(
-            "r.patch",
-            input=image_list,
-            output=f"naip_{year}.{band_name}",
-            nprocs=4,
-            memory=2100,
-            overwrite=True,
-        )
-
+    # Register the maps
     gs.run_command(
-        "r.composite",
-        red=f"naip_{year}.red",
-        green=f"naip_{year}.green",
-        blue=f"naip_{year}.blue",
-        output=f"naip_{year}_rgb",
+        "t.register",
+        input="disch_sum",
+        type="raster",
+        start="2024-01-01",
+        increment=f"{OUTPUT_STEP} minutes",
+        maps=disch_list,
+        flags="i",
         overwrite=True,
     )
 

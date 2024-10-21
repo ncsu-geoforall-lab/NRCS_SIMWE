@@ -8,7 +8,7 @@ from PIL import Image
 
 
 BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
-PROJECT_MAPSET = "basic"
+PROJECT_MAPSET = "basic60"
 SITE_PARAMS = [
     {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
     {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
@@ -30,41 +30,43 @@ def main():
         if not os.path.exists(output_dir):
             os.makedirs(os.path.join(OUTPUT_DIR, site))
 
-        elevation_fig_params = create_elevation_fig(params, output_dir)
-        overview_plot_params.append(elevation_fig_params)
+            elevation_fig_params = create_elevation_fig(params, output_dir)
+            overview_plot_params.append(elevation_fig_params)
 
-        elev_hist_fig_params = create_elevation_hist_fig(params, output_dir)
-        overview_plot_params.append(elev_hist_fig_params)
+            elev_hist_fig_params = create_elevation_hist_fig(
+                params, output_dir
+            )  # noqa: E501
+            overview_plot_params.append(elev_hist_fig_params)
 
-        slope_fig_params = create_slope_fig(params, output_dir)
-        overview_plot_params.append(slope_fig_params)
+            slope_fig_params = create_slope_fig(params, output_dir)
+            overview_plot_params.append(slope_fig_params)
 
-        aspect_fig_params = create_aspect_fig(params, output_dir)
-        overview_plot_params.append(aspect_fig_params)
+            aspect_fig_params = create_aspect_fig(params, output_dir)
+            overview_plot_params.append(aspect_fig_params)
 
-        geomorphon_fig_params = create_geomorphon_fig(params, output_dir)
-        overview_plot_params.append(geomorphon_fig_params)
+            geomorphon_fig_params = create_geomorphon_fig(params, output_dir)
+            overview_plot_params.append(geomorphon_fig_params)
 
-        tcurv_fig_params = create_tcurv_fig(params, output_dir)
-        overview_plot_params.append(tcurv_fig_params)
+            tcurv_fig_params = create_tcurv_fig(params, output_dir)
+            overview_plot_params.append(tcurv_fig_params)
 
-        pcurv_fig_params = create_pcurv_fig(params, output_dir)
-        overview_plot_params.append(pcurv_fig_params)
+            pcurv_fig_params = create_pcurv_fig(params, output_dir)
+            overview_plot_params.append(pcurv_fig_params)
 
-        naip_fig_params = create_naip_fig(params, output_dir)
-        overview_plot_params.append(naip_fig_params)
+            naip_fig_params = create_naip_fig(params, output_dir)
+            overview_plot_params.append(naip_fig_params)
 
-        ndvi_fig_params = create_ndvi_fig(params, output_dir)
-        overview_plot_params.append(ndvi_fig_params)
+            ndvi_fig_params = create_ndvi_fig(params, output_dir)
+            overview_plot_params.append(ndvi_fig_params)
 
-        ssurgo_mukey_fig_params = create_ssurgo_mukey(params, output_dir)
-        overview_plot_params.append(ssurgo_mukey_fig_params)
+            ssurgo_mukey_fig_params = create_ssurgo_mukey(params, output_dir)
+            overview_plot_params.append(ssurgo_mukey_fig_params)
 
-    output_fig = os.path.join(OUTPUT_DIR, "sites_elevation_fig3.png")
-    generate_plots(5, 10, overview_plot_params, output_fig)
+        output_fig = os.path.join(OUTPUT_DIR, "sites_elevation_fig3.png")
+        generate_plots(5, 10, overview_plot_params, output_fig)
 
-    # create_model_run("basic", "depth", True)
-    create_model_run("basic", "disch")
+        create_model_run("basic60", "depth", False)
+        create_model_run("basic60", "disch", False)
 
 
 def create_elevation_fig(site_params, output_dir):
@@ -95,7 +97,7 @@ def create_elevation_hist_fig(site_params, output_dir):
     map_name = "Elevation histogram"
     out_file = os.path.join(output_dir, "elev_hist.png")
     dem_map = gj.Map(use_region=True, height=600, width=600, filename=out_file)
-    dem_map.d_histogram(map="elevation")
+    dem_map.d_histogram(map="elevation@PERMANENT")
     dem_map.show()
     elevation = {
         "filename": out_file,
@@ -301,12 +303,22 @@ def generate_plots(n_rows, n_cols, plot_params, figure_name):
 
     plt.tight_layout()
     plt.savefig(figure_name, bbox_inches="tight", dpi=300)
-    plt.show()
+    # plt.show()
 
 
 def create_model_run(mapset="basic", simtype="depth", gif=False):
     sim_plot_params = []
-    sim_values = [str(i).zfill(2) for i in range(2, 11, 2)]
+    # sim_values = [str(i).zfill(2) for i in range(2, 61, 2)]
+
+    pattern = "depth.*" if simtype == "depth" else "disch.*"
+    data_list = (
+        gs.read_command(
+            "g.list", type="raster", pattern=pattern, separator="comma"
+        )  # noqa: E501
+        .strip()
+        .split(",")
+    )
+    print(data_list)
     for site_param in SITE_PARAMS:
         site = site_param["site"]
         output_dir = os.path.join(OUTPUT_DIR, site, mapset)
@@ -314,16 +326,17 @@ def create_model_run(mapset="basic", simtype="depth", gif=False):
             os.makedirs(os.path.join(OUTPUT_DIR, site, mapset))
         out_file = os.path.join(output_dir, f"{simtype}_simulation.png")
 
-        for i in sim_values:
-            map_name = f"{simtype}.{i}"
-            filename = os.path.join(output_dir, f"{simtype}_{i}.png")
+        for i in data_list:
+            map_name = i
+            filename = os.path.join(output_dir, f"{i.replace('.', '_')}.png")
             gj.init(gisdb, site, mapset)
             map_obj = gj.Map(
                 filename=filename, use_region=True, height=600, width=600
             )  # noqa: E501
             # map_obj.d_rast(map=map_name)
-            map_obj.d_shade(color=map_name, shade="hillshade")
-            map_obj.d_legend(raster=map_name, at=(5, 50, 5, 9), flags="b")
+            _map_name = f"{map_name}@{mapset}"
+            map_obj.d_shade(color=_map_name, shade="hillshade@basic")
+            map_obj.d_legend(raster=_map_name, at=(5, 50, 5, 9), flags="b")
             map_obj.d_barscale(at=(35, 7), flags="n")
             map_obj.show()
             title = "Depth (m)" if simtype == "depth" else "Discharge (m3/s)"
@@ -339,13 +352,14 @@ def create_model_run(mapset="basic", simtype="depth", gif=False):
             depth_sum_ts_map = gj.TimeSeriesMap(
                 height=600, width=600, use_region=True
             )  # noqa: E501
+            # depth_sum_ts_map.add_raster_series(f"depth_sum@{mapset}")
             depth_sum_ts_map.add_raster_series("depth_sum")
             depth_sum_ts_map.d_legend()
             depth_sum_ts_map.render()
             out_file = os.path.join(output_dir, f"{simtype}_simulation.gif")
             depth_sum_ts_map.save(out_file)
 
-    generate_plots(5, 5, sim_plot_params, out_file)
+    generate_plots(12, 5, sim_plot_params, out_file)
 
 
 # Define entry point

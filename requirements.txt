@@ -6,3 +6,4 @@ pystac_client
 tqdm
 ipyleaflet
 folium
+pandas
