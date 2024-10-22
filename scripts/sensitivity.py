@@ -1,4 +1,6 @@
 def montecarlo_sim(n_runs=100):
+    # for i in range(n_runs):
+    #
     pass
 
 

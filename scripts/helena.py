@@ -7,6 +7,41 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
+def simwe_to_strds(
+    search_pattern, strds_output, title, description, output_step=10
+):  # noqa: E501
+    """Create a strds data set from simwe output maps"""
+    # Register the output maps into a space time dataset
+    gs.run_command(
+        "t.create",
+        output=strds_output,
+        type="strds",
+        temporaltype="absolute",
+        title=title,
+        description=description,
+        overwrite=True,
+    )
+
+    # Get the list of depth maps
+    raster_list = gs.read_command(
+        "g.list", type="raster", pattern=search_pattern, separator="comma"
+    ).strip()
+
+    # Register the maps
+    gs.run_command(
+        "t.register",
+        input=strds_output,
+        type="raster",
+        start="2024-01-01",
+        increment=f"{output_step} minutes",
+        maps=raster_list,
+        flags="i",
+        overwrite=True,
+    )
+
+    return strds_output
+
+
 def ground_water_seepage(flow_accum, output_streams, threshold=150):
     """
     Adding baseflow to streams,
@@ -137,7 +172,7 @@ def create_model_run(output_dir, site, mapset, search_pattern, title):
         )  # noqa: E501
         # map_obj.d_rast(map=map_name)
         _map_name = f"{map_name}@{mapset}"
-        map_obj.d_shade(color=_map_name, shade="hillshade@basic")
+        map_obj.d_shade(color=_map_name, shade="hillshade")
         map_obj.d_legend(raster=_map_name, at=(5, 50, 5, 9), flags="b")
         map_obj.d_barscale(at=(35, 7), flags="n")
         map_obj.show()
@@ -145,11 +180,11 @@ def create_model_run(output_dir, site, mapset, search_pattern, title):
         output_params = {
             "filename": filename,
             "title": f"{site} {title}",
-            "rast_map": f"{i} minutes",
+            "rast_map": f"{i.split('.')[-1]} minutes",
         }
         sim_plot_params.append(output_params)
 
-    generate_plots(1, 3, sim_plot_params, out_file)
+    generate_plots(1, 5, sim_plot_params, out_file)
 
 
 def create_figures(output_directory, mapset, site):
@@ -204,7 +239,7 @@ def create_figures(output_directory, mapset, site):
 
 
 def main():
-    PROJECT_MAPSET = "ground_water"
+    PROJECT_MAPSET = "ground_water2"
     elevation = "elevation"
     dx = "dx"
     dy = "dy"
@@ -248,6 +283,14 @@ def main():
                     overwrite=True,
                 )
 
+                gs.run_command(
+                    "r.relief",
+                    input=elevation,
+                    output="hillshade",
+                    zscale=1,
+                    overwrite=True,
+                )
+
                 print("Calculating flow accumulation")
                 gs.run_command(
                     "r.watershed",
@@ -287,8 +330,8 @@ def main():
                     discharge="disch_rain_gw",
                     rain=rain,
                     nwalk=500000,
-                    niterations=30,
-                    output_step=10,
+                    niterations=20,
+                    output_step=4,
                 )
 
                 # Simulate groundwater seepage in streams no rainfall
@@ -302,8 +345,8 @@ def main():
                     discharge="disch_gw",
                     rain=rain,
                     nwalk=500000,
-                    niterations=30,
-                    output_step=10,
+                    niterations=20,
+                    output_step=4,
                 )
 
                 # "springs" only
@@ -317,10 +360,52 @@ def main():
                     discharge="disch_springs",
                     rain=rain,
                     nwalk=500000,
-                    niterations=60,
-                    output_step=20,
+                    niterations=20,
+                    output_step=4,
                 )
-                create_figures("output", PROJECT_MAPSET, project_name)
+                simwe_to_strds(
+                    search_pattern="depth_rain_gw.*",
+                    strds_output="depth_rain_gw_sum",
+                    title="Runoff Depth",
+                    description="Runoff Depth in [m]",
+                    output_step=4,
+                )
+                simwe_to_strds(
+                    search_pattern="disch_rain_gw.*",
+                    strds_output="disch_rain_gw_sum",
+                    title="Runoff Discharge",
+                    description="Runoff Discharge in [m3/s]",
+                    output_step=4,
+                )
+                simwe_to_strds(
+                    search_pattern="depth_gw.*",
+                    strds_output="depth_gw_sum",
+                    title="Runoff Depth",
+                    description="Runoff Depth in [m]",
+                    output_step=4,
+                )
+                simwe_to_strds(
+                    search_pattern="disch_gw.*",
+                    strds_output="disch_gw_sum",
+                    title="Runoff Discharge",
+                    description="Runoff Discharge in [m3/s]",
+                    output_step=4,
+                )
+                simwe_to_strds(
+                    search_pattern="depth_springs.*",
+                    strds_output="depth_springs_sum",
+                    title="Runoff Depth",
+                    description="Runoff Depth in [m]",
+                    output_step=4,
+                )
+                simwe_to_strds(
+                    search_pattern="disch_springs.*",
+                    strds_output="disch_springs_sum",
+                    title="Runoff Discharge",
+                    description="Runoff Discharge in [m3/s]",
+                    output_step=4,
+                )
+                create_figures("output", PROJECT_MAPSET, project_name)  # noqa: E501
             except ValueError:
                 exit(1)
 
