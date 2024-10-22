@@ -68,3 +68,27 @@ Simulation GIF: ![depth_simulation.gif](basic/depth_simulation.gif)
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
 | ![disch_rain_gw_04](ground_water2/disch_rain_gw_04.png) | ![disch_rain_gw_08](ground_water2/disch_rain_gw_08.png) | ![disch_rain_gw_12](ground_water2/disch_rain_gw_12.png) | ![disch_rain_gw_16](ground_water2/disch_rain_gw_16.png) | ![disch_rain_gw_20](ground_water2/disch_rain_gw_20.png)
+
+#### Depth - Simulated with groundwater seepage in streams no rainfall
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![depth_gw_04](ground_water2/depth_gw_04.png) | ![depth_gw_08](ground_water2/depth_gw_08.png) | ![depth_gw_12](ground_water/depth_gw_12.png) | ![depth_gw_16](ground_water2/depth_gw_16.png) | ![depth_gw_20](ground_water2/depth_gw_20.png)
+
+#### Discharge - Simulated with groundwater seepage in streams no rainfall
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![disch_gw_04](ground_water2/disch_gw_04.png) | ![disch_gw_08](ground_water2/disch_gw_08.png) | ![disch_gw_12](ground_water2/disch_gw_12.png) | ![disch_gw_16](ground_water2/disch_gw_16.png) | ![disch_gw_20](ground_water2/disch_gw_20.png)
+
+#### Depth - Simulated with springs
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![depth_spring_04](ground_water2/depth_springs_04.png) | ![depth_spring_08](ground_water2/depth_springs_08.png) | ![depth_spring_12](ground_water2/depth_springs_12.png) | ![depth_spring_16](ground_water2/depth_springs_16.png) | ![depth_spring_20](ground_water2/depth_springs_20.png)
+
+#### Discharge - Simulated with springs
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![disch_spring_04](ground_water2/disch_springs_04.png) | ![disch_spring_08](ground_water2/disch_springs_08.png) | ![disch_spring_12](ground_water2/disch_springs_12.png) | ![disch_spring_16](ground_water2/disch_springs_16.png) | ![disch_spring_20](ground_water2/disch_springs_20.png)
