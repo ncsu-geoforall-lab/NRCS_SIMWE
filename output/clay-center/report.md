@@ -73,7 +73,7 @@ Simulation GIF: ![depth_simulation.gif](basic/depth_simulation.gif)
 
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
-| ![depth_gw_04](ground_water2/depth_gw_04.png) | ![depth_gw_08](ground_water2/depth_gw_08.png) | ![depth_gw_12](ground_water/depth_gw_12.png) | ![depth_gw_16](ground_water2/depth_gw_16.png) | ![depth_gw_20](ground_water2/depth_gw_20.png)
+| ![depth_gw_04](ground_water2/depth_gw_04.png) | ![depth_gw_08](ground_water2/depth_gw_08.png) | ![depth_gw_12](ground_water2/depth_gw_12.png) | ![depth_gw_16](ground_water2/depth_gw_16.png) | ![depth_gw_20](ground_water2/depth_gw_20.png)
 
 #### Discharge - Simulated with groundwater seepage in streams no rainfall
 
