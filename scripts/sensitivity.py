@@ -69,7 +69,6 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
                     particles,
                     res,
                     scalar,
-                    i,
                     random_seed=i,
                 )
 
@@ -79,7 +78,7 @@ def envelope_curve():
 
 
 def simwe(
-    elevation, dx, dy, depth, disch, particles, res, scalar, i, **kwargs
+    elevation, dx, dy, depth, disch, particles, res, scalar, **kwargs
 ):  # noqa: E501
     """Run the SIMWE model"""
     print("Running the SIMWE model")
@@ -106,8 +105,8 @@ def simwe(
     )
 
     # Register the output maps into a space time dataset
-    depth_strds_name = f"depth_sum_{res}_{scalar}_{i}"
-    disch_strds_name = f"disch_sum_{res}_{scalar}_{i}"
+    depth_strds_name = f"depth_sum_{res}_{scalar}_{random_seed}"
+    disch_strds_name = f"disch_sum_{res}_{scalar}_{random_seed}"
 
     gs.run_command(
         "t.create",
