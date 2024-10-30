@@ -7,3 +7,4 @@ tqdm
 ipyleaflet
 folium
 pandas
+seaborn
