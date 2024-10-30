@@ -3,6 +3,25 @@ import sys
 import subprocess
 
 
+# Create stats for depth and discharge maps for the stochasic simulations
+def strds_stats_maps(input_strds, output):
+    methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"  # noqa: E501
+    outputs = ",".join([f"{output}_{m}" for m in methods.split(",")])
+    gs.run_command(
+        "t.rast.series",
+        input=input_strds,
+        output=outputs,
+        method=methods,
+        flags="t",
+        nprocs=30,
+        overwrite=True,
+    )
+
+
+def envelope_curve():
+    pass
+
+
 def calculate_particle_density(cells, scale_factor):
     """Calculate the particle density"""
     min_particles = 1000
@@ -19,7 +38,7 @@ def calculate_particle_density(cells, scale_factor):
     if particles > max_particles:
         gs.warning(
             _(  # noqa: F821
-                f"Number of particles is less than the minimum threshold of {min_particles}"  # noqa: E501
+                f"Number of particles is greater than the maximum threshold of {max_particles}"  # noqa: E501
             )
         )
         particles = max_particles
@@ -37,12 +56,18 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
     8	8x0.5	8x1	8x3	8x5	8x10	8x30
     16	16x0.5	16x1	16x3	16x5	16x10	16x30
     """
-    model_spatial_res_params = [0.5, 1, 3, 5, 10, 30]  # meters
-    model_particle_density_scalar_params = [0.5, 1, 2, 4, 8, 16]
-
+    model_spatial_res_params = [1, 3, 5, 10, 30]  # meters
+    model_particle_density_scalar_params = [0.5, 1, 2, 4, 8]
+    total_runs = len(model_spatial_res_params) * len(
+        model_particle_density_scalar_params
+    )
+    run_n = 0
+    print("Running the sensitivity analysis...")
     for res in model_spatial_res_params:
-        gs.run_command("g.region", res=res, flags="a")
+        gs.run_command("g.region", raster=elevation, res=res, flags="a")
         resampled_elevation = f"{elevation}_{res}"
+
+        # Resample Elevation
         gs.run_command(
             "r.resamp.interp",
             input=elevation,
@@ -51,16 +76,29 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
             overwrite=True,
             nprocs=6,
         )
+
+        # Calculate dx and dy
+        gs.run_command(
+            "r.slope.aspect",
+            elevation=resampled_elevation,
+            dx="dx",
+            dy="dy",
+            overwrite=True,
+        )
+
         for scalar in model_particle_density_scalar_params:
+            print(f"Progress: {run_n+1}/{total_runs}", end="\r")
             # Calculate the number of particles
             cells = cell_count(resampled_elevation)
             particles = calculate_particle_density(cells, scalar)
             # Run monte carlo simulation of the model
-            n_runs = 100
+            n_runs = 10
             for i in range(n_runs):
-                depth_x = f"{depth}_{res}_{scalar}_{i}"
-                dish_y = f"{disch}_{res}_{scalar}_{i}"
-                simwe(
+
+                scalar_str = str(scalar).replace(".", "")
+                depth_x = f"{depth}_{res}_{scalar_str}_{i}"
+                dish_y = f"{disch}_{res}_{scalar_str}_{i}"
+                strds_depth, strds_disch = simwe(
                     resampled_elevation,
                     dx,
                     dy,
@@ -72,9 +110,8 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
                     random_seed=i,
                 )
 
-
-def envelope_curve():
-    pass
+                strds_stats_maps(strds_depth, f"{strds_depth}_stats")
+                strds_stats_maps(strds_disch, f"{strds_disch}_stats")
 
 
 def simwe(
@@ -105,8 +142,9 @@ def simwe(
     )
 
     # Register the output maps into a space time dataset
-    depth_strds_name = f"depth_sum_{res}_{scalar}_{random_seed}"
-    disch_strds_name = f"disch_sum_{res}_{scalar}_{random_seed}"
+    scalar_str = str(scalar).replace(".", "")
+    depth_strds_name = f"depth_sum_{res}_{scalar_str}_{random_seed}"
+    disch_strds_name = f"disch_sum_{res}_{scalar_str}_{random_seed}"
 
     gs.run_command(
         "t.create",
@@ -163,10 +201,15 @@ def simwe(
         overwrite=True,
     )
 
+    return depth_strds_name, disch_strds_name
+
 
 def cell_count(elevation):
     """Count the number of cells in the elevation raster"""
-    return int(gs.read_command("r.univar", map=elevation, flags="g")["cells"])
+    univar = gs.parse_command("r.univar", map=elevation, format="json")
+    cells = univar[0]["n"]
+    print(f"Number of cells: {cells}")
+    return cells
 
 
 def main():
@@ -200,20 +243,17 @@ def main():
 
         sensitivity_analysis(elevation, dx, dy, depth, disch)
 
-    # TODO
-    # Create Min and Max depth and discharge maps for the stochasic simulations
-
-    # Create average depth and discharge accross all simulations
-    # for the stochasic runs
-
     # Create floor and ceiling maps for the stochasic runs
 
-    # Create stability maps for the stochasic runs
+    # Create stability/disturbance maps for the stochasic runs
 
     # Create the sensitivity analysis
 
     # Identify sampling locations for hydrograph generation
     # Ground truthing...
+
+    # TODO
+    # https://salib.readthedocs.io/en/latest/user_guide/basics.html#what-is-sensitivity-analysis
 
 
 if __name__ == "__main__":
