@@ -1,6 +1,20 @@
 import os
 import sys
 import subprocess
+import time
+
+# Constants
+N_RUNS = 10  # How many times to run SIMWE with a different random seed
+OUTPUT_STEP = 5  # SIMWE time step in minutes
+PROJECT_MAPSET = "sensitivity"
+
+SITE_PARAMS = [
+    {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
+    # {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
+    # {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
+    # {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
+    # {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
+]
 
 
 # Create stats for depth and discharge maps for the stochasic simulations
@@ -18,8 +32,147 @@ def strds_stats_maps(input_strds, output):
     )
 
 
-def envelope_curve():
-    pass
+def create_static_map(site, step, method):
+    dem_map = gj.Map(
+        use_region=True,
+        height=600,
+        width=600,
+        filename=f"output/{site}_depth_1_1_s_{step}_{method}.png",
+    )
+    dem_map.d_shade(
+        color=f"depth_1_1_s_{step}_{method}", shade="relief", brighten=30
+    )  # noqa: E501
+    dem_map.d_legend(
+        raster=f"depth_1_1_s_{step}_{method}", at=(5, 50, 5, 9), flags="b"
+    )  # noqa: E501
+    dem_map.d_barscale(at=(35, 7), flags="n")
+    dem_map.show()
+
+
+def create_output_timeseries_gif(site, method):
+    ts_map = gj.TimeSeriesMap()
+    ts_map.add_raster_series(f"depth_1_1_s_{method}")
+    ts_map.d_legend()
+    ts_map.show()
+    ts_map.save(f"output/{site}_depth_1_1_s_{method}.gif")
+
+
+def sample_random_point_envelope(n, time_steps):
+    import pandas as pd
+
+    tmp_data = []
+    gs.run_command("v.random", output="random_points", npoints=n, seed=7)
+    for step in time_steps:
+        json_output = gs.parse_command(
+            "r.what",
+            points="random_points",
+            map=f"depth_1_1_s_{step}_median,depth_1_1_s_{step}_minimum,depth_1_1_s_{step}_maximum",  # noqa: E501
+            format="json",
+        )
+        new_json = {
+            "step": int(step),
+            "core": json_output[0][f"depth_1_1_s_{step}_minimum"]["value"],
+            "envelope": json_output[0][f"depth_1_1_s_{step}_maximum"]["value"],
+            "median": json_output[0][f"depth_1_1_s_{step}_median"]["value"],
+        }
+        tmp_data.append(new_json)
+
+    df = pd.DataFrame(tmp_data)
+    return df
+
+
+def plot_envelope_curve(df_samples):
+    """Plot the envelope curve"""
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    f, ax = plt.subplots(figsize=(11, 9))
+    sns.lineplot(data=df_samples, x="step", y="core")
+    sns.lineplot(data=df_samples, x="step", y="median", dashes=True)
+    sns.lineplot(data=df_samples, x="step", y="envelope")
+    plt.legend(["Core", "Envelope", "Median"])
+    plt.show()
+
+
+def envelope_curve(site, time_steps=["05", "10", "15", "25", "30"]):
+    # Get flow likihood
+
+    for step in time_steps:
+        search_pattern = f"depth_1_1_*.{step}"
+        depth_list_05 = gs.read_command(
+            "g.list",
+            type="raster",
+            pattern=search_pattern,
+            separator="comma",  # noqa: E501
+        ).strip()
+
+        for raster in depth_list_05.split(","):
+            output = f"{raster}_01m"
+            gs.run_command(
+                "r.mapcalc",
+                expression=f"{output} = if({raster} >= 0.01, {raster}, null())",  # noqa: E501
+            )
+
+            search_pattern = f"depth_1_1_*.{step}_01m"
+            depth_list_05 = gs.read_command(
+                "g.list",
+                type="raster",
+                pattern=search_pattern,
+                separator="comma",  # noqa: E501
+            ).strip()
+            method = "maximum"
+            gs.run_command(
+                "r.series",
+                input=depth_list_05,
+                output=f"depth_1_1_s_{step}_{method}",
+                method=method,
+            )
+
+            gs.run_command(
+                "r.colors",
+                map=f"depth_1_1_s_{step}_{method}",
+                raster=f"depth_1_1_1.{step}",
+            )
+            # gs.run_command(
+            #   "r.colors",
+            # map=f"depth_1_1_s_{step}_{method}",
+            # color="magma",
+            # flags="e"
+            # )
+            create_static_map(site, step, method)
+
+    depth_list_avg = gs.read_command(
+        "g.list",
+        type="raster",
+        pattern=f"depth_1_1_s_*_{method}",
+        separator="comma",  # noqa: E501
+    ).strip()
+
+    strds_name = f"depth_1_1_s_{method}"
+    gs.run_command(
+        "t.create",
+        output=strds_name,
+        type="strds",
+        temporaltype="absolute",
+        title=f"{method} Runoff Depth",
+        description="Runoff Depth in [m]",
+        overwrite=True,
+    )
+
+    gs.run_command(
+        "t.register",
+        input=strds_name,
+        type="raster",
+        start="2024-01-01",
+        increment=f"{OUTPUT_STEP} minutes",
+        maps=depth_list_avg,
+        flags="i",
+        overwrite=True,
+    )
+
+    create_output_timeseries_gif(site, method, time_steps)
+    df_samples = sample_random_point_envelope(1, time_steps)
+    plot_envelope_curve(df_samples)
 
 
 def calculate_particle_density(cells, scale_factor):
@@ -98,6 +251,7 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
                 scalar_str = str(scalar).replace(".", "")
                 depth_x = f"{depth}_{res}_{scalar_str}_{i}"
                 dish_y = f"{disch}_{res}_{scalar_str}_{i}"
+                error = f"error_{res}_{scalar_str}_{i}"
                 strds_depth, strds_disch = simwe(
                     resampled_elevation,
                     dx,
@@ -107,6 +261,7 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
                     particles,
                     res,
                     scalar,
+                    error,
                     random_seed=i,
                 )
 
@@ -115,13 +270,18 @@ def sensitivity_analysis(elevation, dx, dy, depth, disch):
 
 
 def simwe(
-    elevation, dx, dy, depth, disch, particles, res, scalar, **kwargs
+    elevation, dx, dy, depth, disch, particles, res, scalar, error, **kwargs
 ):  # noqa: E501
     """Run the SIMWE model"""
-    print("Running the SIMWE model")
     niterations = 30
     random_seed = kwargs.get("random_seed", None)
     OUTPUT_STEP = 5  # minutes
+    print(
+        f"""
+        Running the SIMWE model: Res:{res}, Scalar:{scalar}, Seed:{random_seed}
+    """
+    )
+    start_time = time.time()
     gs.run_command(
         "r.sim.water",
         elevation=elevation,
@@ -136,11 +296,14 @@ def simwe(
         depth=depth,  # m
         discharge=disch,  # m3/s
         random_seed=random_seed,  # Selct a distinct random seed
+        error=error,  # m
         nprocs=30,
         flags="t",
         overwrite=True,
     )
-
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {elapsed_time} seconds")
     # Register the output maps into a space time dataset
     scalar_str = str(scalar).replace(".", "")
     depth_strds_name = f"depth_sum_{res}_{scalar_str}_{random_seed}"
@@ -214,16 +377,6 @@ def cell_count(elevation):
 
 def main():
 
-    PROJECT_MAPSET = "sensitivity"
-
-    SITE_PARAMS = [
-        {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
-        # {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
-        # {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
-        # {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
-        # {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
-    ]
-
     elevation = "elevation"
     dx = "dx"
     dy = "dy"
@@ -273,6 +426,7 @@ if __name__ == "__main__":
     )
 
     import grass.script as gs
+    import grass.jupyter as gj
 
     # Execute the main function
     sys.exit(main())
