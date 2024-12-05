@@ -1,0 +1,26 @@
+project:
+  type: website
+  output-dir: docs
+website:
+  navbar:
+    title: "SIMWE - NRCS"
+    background: primary
+    search: true
+    left:
+      - text: "Home"
+        href: index.qmd
+    tools:
+      - icon: github
+        menu:
+          - text: "Source Code"
+            href: "https://github.com/ncsu-geoforall-lab/NRCS_SIMWE"
+          - text: "Report an Issue"
+            href: "https://github.com/ncsu-geoforall-lab/NRCS_SIMWE/issues"
+
+execute:
+  freeze: auto
+format:
+  html:
+    theme: [pandoc, grass.scss]
+    toc: true
+    toc-title: Table of Contents

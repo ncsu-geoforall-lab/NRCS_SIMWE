@@ -1,0 +1,80 @@
+---
+draft: false
+title: "Sensitivity Analysis of Spatial Scale and Particle Density on Overland Flow Pattern Accuracy and Computational Demand"
+title-slide-attributes:
+    data-color: grass-color-primary
+page-layout: full
+title-block-banner: true
+image: ../output/clay-center/slope.png
+subtitle: "AGU 2024, Washington D.C"
+author:
+  - name: "Corey White"
+    degrees: PhD
+    url: "https://github.com/cwhite911"
+    orcid: "0000-0002-2903-9924"
+    email: "ctwhite@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: op
+  - name: "Caitlin Haedrich"
+    url: ""
+    orcid: ""
+    email: ""
+    affiliations:
+      - ref: cga
+  - name: "Helena Mitasova"
+    degrees: PhD
+    url: ""
+    orcid: ""
+    email: ""
+    affiliations:
+      - ref: cga
+date: "Thursday, 12 December 2024"
+acknowledgements: |
+    This talk was funded by the [US National Science Foundation (NSF)](https://www.nsf.gov/), award [2303651](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2303651) and [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+affiliations:
+  - id: cga
+    name: Center for Geospatial Analytics at NC State University
+    url: "https://cnr.ncsu.edu/geospatial/"
+  - id: op
+    name: OpenPlains Inc.
+    url: "https://openplains.com"
+  - id: md
+    name: Mundialis
+    url: "https://www.mundialis.de/en/"
+format:
+  revealjs:
+    theme: [simple, ../grass.scss]
+    footer: "[Return Home](/)"
+
+    template-partials:
+      - ../templates/title-slide.html
+    controls-layout: bottom-right
+---
+
+# What is SIMWE?
+
+**SIMWE** (SIMulation of Water Erosion Model) is a spatially distributed processes-based overland flow model that simulates water flow using the Monte Carlo path sampling method.
+
+## Computational Demands of Overland Flow Modeling
+
+- Restrictive for research and policy development
+- Emergency management applications require rapid response times
+- Accuracy depends on particle density
+- Spatial scale influences particle density required for accurate results
+
+# Why is this a problem?
+The accuracy of overland flow simulations using path sampling methods depends heavily on particle density.
+However, varying particle density and spatial scale can be computationally demanding.
+
+# How did we approach this problem?
+We varied particle density and spatial scale to understand their impact on simulated water flow patterns.
+We also repeated our analysis on several different terrain types to account for terrain slope and complexity.
+
+# What did we find?
+Our results show that there is a strong relationship between particle density, spatial scale, and computational demands.
+We also identified optimal particle density ranges for different spatial scales and terrain types.
+
+# What's next?
+Our findings have implications for future users of the SIMWE model.
+We hope that our work will help optimize tradeoffs between accuracy and computational demand.
