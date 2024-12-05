@@ -8,3 +8,5 @@ ipyleaflet
 folium
 pandas
 seaborn
+scipy
+SALib

@@ -6,8 +6,8 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 
 ## Objectives
 
-- [ ] Develop pre-processing modules to translate basic soil properties and site conditions into model input parameters.
-- [ ] Perform a sensitivity analysis to identify optimal ranges of and interactions between model input parameters.
+- [WIP] Develop pre-processing modules to translate basic soil properties and site conditions into model input parameters.
+- [WIP] Perform a sensitivity analysis to identify optimal ranges of and interactions between model input parameters.
 - [ ] Explore the capability of the model to accept and utilize time-varying inputs.
 - [ ] Expand model capabilities to include multiple and consecutive rainfall events and account for antecedent conditions.
 - [ ] Develop multilayer SIMWE model simulations that account for multiple subsurface soil layers.
@@ -22,7 +22,6 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 - [x] Run basic SIMWE simulation
 
 Report: [output/clay-center/report.md](output/clay-center/report.md)
-
 
 ### Coweeta
 
