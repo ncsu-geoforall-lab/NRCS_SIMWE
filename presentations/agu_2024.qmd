@@ -185,14 +185,14 @@ We also repeated our analysis on several different terrain types to account for 
 | **Disk Capacity** | 8.0 TB                                       |
 :::
 
-## Implemented in GRASS GIS (v8.5) {transition="slide" transition-speed="medium" .text-center}
+## GRASS GIS (v8.5) {transition="slide" transition-speed="medium" .text-center}
 
 ::: {.columns}
 :::{.column width=40%}
 ![](https://grass.osgeo.org/images/logos/grasslogo.svg){.r-stretch fig-align="center" width="50%"}
 :::
 :::{.column width=60%}
-**Geospatial Computational Engine**
+**Geospatial Processing Engine**
 
 - C and Python API
 - Open Source GPL v2
