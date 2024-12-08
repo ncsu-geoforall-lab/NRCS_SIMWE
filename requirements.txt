@@ -10,3 +10,9 @@ pandas
 seaborn
 scipy
 SALib
+pyvista
+trame
+trame-vtk
+trame-vuetify
+pyvistaqt
+pyqt5

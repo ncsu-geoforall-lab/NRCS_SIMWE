@@ -23,6 +23,13 @@ $presentation-heading-color: $grass-color-primary;
     font-weight: bold;
   }
 
+.highlight-current-primary {
+    color: $grass-color-primary !important;
+    font-size: calc(2em + 1vw);
+    font-weight: bold;
+    font-display: bold;
+  }
+
 .circle-image-container {
     position: relative;
     // width: 100%;
@@ -71,9 +78,17 @@ $presentation-heading-color: $grass-color-primary;
     }
     .quarto-title-block {
 
+        .title {
+            color: $grass-color-primary !important;
+        }
+
         .quarto-title-acknowledgements {
         color: $grass-color-primary !important;
         font-size: 0.6em;
+        }
+
+        .quarto-title-affiliation {
+          font-size: 0.5em !important;
         }
     }
 }
