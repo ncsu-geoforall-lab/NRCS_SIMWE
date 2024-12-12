@@ -32,7 +32,7 @@ author:
       - ref: meas
 date: "Thursday, 12 December 2024"
 acknowledgements: |
-    This talk was funded by the [US National Science Foundation (NSF)](https://www.nsf.gov/), award [2303651](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2303651) and [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
 affiliations:
   - id: cga
     name: Center for Geospatial Analytics at NC State University
@@ -72,10 +72,9 @@ SIMWE uses **Green’s function** to solve the **St. Venant system of equations*
 # Why this method? {transition="slide" transition-speed="medium"}
 
 Water flows according to the shallow water bivariate **continuity equation** (mass conservation), incorporating **drift** and **diffusion**, which allows the **elevation model** to remain **unmodified** (e.g., no sink and fill processing).
-
-$$
+<!-- $$
 \frac{∂h}{∂t}+(\frac{∂hv_x}{∂x}+\frac{∂hv_y}{∂y}) = 0
-$$
+$$ -->
 
 ---
 
@@ -87,13 +86,16 @@ Solution of SWF equation incorporates spatially variable flow velocity
 * **Topography** (slope steepness)
 * **Land cover** (Mannings roughness coefficient)
 
-## Path Sampling Accuarcy {transition="slide" transition-speed="medium"}
 
-Error is proportional to $1/\sqrt{N}$
+## Computational Demands of Overland Flow Modeling? {transition="slide" transition-speed="medium" .smaller}
 
+The accuracy of overland flow simulations using path sampling methods depends heavily on particle density.
+However, varying particle density and spatial scale can be computationally demanding.
+
+> Error is proportional to $1/\sqrt{N}$
 where $N$ is number of particles.
 
-## Computational Demands of Overland Flow Modeling {transition="slide" transition-speed="medium" .smaller}
+## Why is this a problem? {transition="slide" transition-speed="medium" .smaller}
 
 :::{.columns}
 :::{.column width=50%}
@@ -120,56 +122,31 @@ where $N$ is number of particles.
 :::
 :::
 
-# Why is this a problem? {transition="slide" transition-speed="medium" .smaller}
-The accuracy of overland flow simulations using path sampling methods depends heavily on particle density.
-However, varying particle density and spatial scale can be computationally demanding.
+
 
 # How did we approach this problem? {transition="slide" transition-speed="medium" .smaller}
-We varied particle density and spatial scale to understand their impact on simulated water flow patterns.
-We also repeated our analysis on several different terrain types to account for terrain slope and complexity.
 
-## Study Areas {transition="slide" transition-speed="medium" .smaller}
+## Software {transition="slide" transition-speed="medium" .text-center}
 
-:::{.columns}
-:::{.column width=50%}
-#### SJER {.fade-in}
-![](../output/SJER/naip.png){.fragment width="45%"}
-![](../output/SJER/elev.png){.fragment width="45%"}
-![](../output/SJER/slope.png){.fragment width="45%"}
-![](../output/SJER/aspect.png){.fragment width="45%"}
+::: {.columns}
+:::{.column width=40%}
+![](https://grass.osgeo.org/images/logos/grasslogo.svg){.r-stretch fig-align="center" width="50%"}
+
+
 :::
-:::{.column width=50%}
-#### Clay Center {.fade-in}
-![](../output/clay-center/naip.png){.fragment width="45%"}
-![](../output/clay-center/elev.png){.fragment width="45%"}
-![](../output/clay-center/slope.png){.fragment width="45%"}
-![](../output/clay-center/aspect.png){.fragment width="45%"}
+:::{.column width=60%}
+
+- GRASS GIS v8.5
+- Geospatial Processing Engine
+- C and Python APIs
+- Open Source GPL v3
+- Parallelized (OpenMP)
+
+- SIMWE implemented as GRASS module **r.sim.water**
+
+
 :::
 :::
-
-
-
-## Study Areas 1 {transition="slide" transition-speed="medium" .smaller}
-
-:::{.fragment .fade-in-then-out}
-![SJER](../output/clay-center/naip.png)
-![SJER](../output/clay-center/elev.png)
-:::
-
-
-
-
-## Study Areas {transition="slide" transition-speed="medium" .smaller}
-
-| Site | Area $km^2$ | Min Elv ($m$) | Max Elv ($m$) | Mean ($m$) | Std | |
-|---------|:-----|------:|---|---|---|---|
-| SJER | 0.29 |333.16|371.12|349.68|7.95| ![](../output/SJER/naip.png){width=18%} |
-| Clay Center | 1.52 |---|---|---|---| ![](../output/clay-center/naip.png){width=18%} |
-| Coweeta | 57.02 |---|---|---|---| ![](../output/coweeta/naip.png){width=18%} |
-| SFREC | 0.38 |---|---|---|---| ![](../output/SFREC/naip.png){width=18%} |
-| tx069-playas | 324.44 |---|---|---|---| ![](../output/tx069-playas/naip.png){width=18%} |
-
-: {.striped .hover .responsive-sm}
 
 ## Computational Resources {transition="slide" transition-speed="medium" .smaller .text-center}
 
@@ -185,85 +162,291 @@ We also repeated our analysis on several different terrain types to account for 
 | **Disk Capacity** | 8.0 TB                                       |
 :::
 
-## GRASS GIS (v8.5) {transition="slide" transition-speed="medium" .text-center}
 
-::: {.columns}
+
+## Model Parameterization {transition="slide" transition-speed="medium" .smaller}
+
+:::{.columns}
+:::{.column width=50%}
+#### Spatially Uniform Parameters
+
+::: {.fragment .highlight-current-blue}
+- **Rainfall:** 50 $mm/hr$
+:::
+::: {.fragment .highlight-current-blue}
+- **Infiltration Rate:** 0 $mm/hr$
+:::
+::: {.fragment .highlight-current-blue}
+- **Manning's C:** 0.1
+:::
+
+#### Temporal Parameters
+
+::: {.fragment .highlight-current-blue}
+- **Time Step:** 5 min
+:::
+::: {.fragment .highlight-current-blue}
+- **Event Duration:** 30 min
+:::
+
+#### Resolution and Particle Density
+
+::: {.fragment .highlight-current-blue}
+- **Resolution:** [1, 3, 5, 10 ,30]
+:::
+::: {.fragment .highlight-current-blue}
+- **Particle Density:** [0.25, 0.5, 1, 2, 4]
+:::
+
+:::
+:::{.column width=50%}
+```python
+    gs.run_command(
+        "r.sim.water",
+        elevation=elevation,
+        dx=dx,
+        dy=dy,
+        rain_value=50,  # mm/hr
+        infil_value=0.0,  # mm/hr
+        man_value=0.1,
+        nwalkers=particles,
+        niterations=niterations,  # duration (minutes)
+        output_step=OUTPUT_STEP,  # minutes
+        depth=depth,  # m
+        discharge=disch,  # m3/s
+        random_seed=random_seed,
+        nprocs=30,
+        flags="t",
+    )
+```
+GRASS GIS Python API
+:::
+:::
+
+## Area Ruggedness Scale (ARS) {transition="slide" transition-speed="medium" .smaller}
+
+- **TRI (Terrain Ruggedness Index):** measures the differnce in elevation between cells using a moving window (Riley et al., 1999).
+  - TRI ran with a 5x5 Neighborhood
+- **Area Ruggedness Scale (ARS):**  is the mean **TRI (Terrain Ruggedness Index)** for the entire study area.
+
+  :::{.fragment .fade-in-then-out}
+
+  * Less Rugged: Low Values
+  * More Rugged: High Values
+  :::
+
+## Study Areas - SJER {transition="slide" transition-speed="medium" .smaller}
+
+:::{.columns}
+
+:::{.column width=50%}
+![](../output/SJER/naip.png){ width="45%"}
+![](../output/SJER/elev.png){ width="45%"}
+![](../output/SJER/slope.png){ width="45%"}
+![](../output/SJER/aspect.png){ width="45%"}
+:::
+:::{.column width=50%}
+| Site Details  |  |   |
+|---------|:-----|
+| EPSG    | 26911 |
+| Res.    | 1 $m$ |
+| Cells   | 295,126 |
+| Area    | 0.3 $km^2$|
+| ARS     | 0.14 |
+
+| Elevation  |     |
+|---------|-----|
+| Min - Max  | 333.12 - 371.12  $m$|
+| Range  | 38.0  $m$ |
+| Mean | 349.67 $m$ |
+| Std  | 7.96 |
+:::
+:::
+
+
+## Study Area - Clay Center {transition="slide" transition-speed="medium" .smaller}
+
+:::{.columns}
+:::{.column width=50%}
+![](../output/clay-center/naip.png){ width="45%"}
+![](../output/clay-center/elev.png){ width="45%"}
+![](../output/clay-center/slope.png){ width="45%"}
+![](../output/clay-center/aspect.png){ width="45%"}
+:::
+:::{.column width=50%}
+
+| Site Details    |  |    |
+|---------|:-----|
+| EPSG    | 32614 |
+| Res.    | 3 $m$ |
+| Cells   | 170,244 |
+| Area    | 1.53  $km^2$|
+| ARS     | 0.13    |
+
+| Elevation   |     |
+|---------|-----|
+| Min - Max | 376.69 - 396.57 $m$|
+| Range  | 19.9 $m$|
+| Mean | 386.71 $m$ |
+| Stddev | 5.03 |
+
+
+:::
+:::
+
+## Study Area - Coweeta {transition="slide" transition-speed="medium" .smaller}
+
+
+:::{.columns}
+:::{.column width=50%}
+![](../output/coweeta//naip.png){width="45%"}
+![](../output/coweeta/elev.png){width="45%"}
+![](../output/coweeta/slope.png){width="45%"}
+![](../output/coweeta/aspect.png){width="45%"}
+:::
+:::{.column width=50%}
+
+| Site Details    |  |    |
+|---------|:-----|
+| EPSG    | 26917 |
+| Res.    | 10 $m$ |
+| Cells   | 572,246 |
+| Area    | 57.17  $km^2$|
+| ARS     | 5.5   |
+
+| Elevation   |     |
+|---------|-----|
+| Min - Max | 652.8 - 1597.6 $m$|
+| Range  | 944.8 $m$|
+| Mean | 1043.83 $m$ |
+| Stddev | 230.3 |
+
+
+:::
+:::
+
+## Study Area - SFREC {transition="slide" transition-speed="medium" .smaller}
+
+
+:::{.columns}
+:::{.column width=50%}
+![](../output/SFREC//naip.png){width="45%"}
+![](../output/SFREC/elev.png){width="45%"}
+![](../output/SFREC/slope.png){width="45%"}
+![](../output/SFREC/aspect.png){width="45%"}
+:::
+:::{.column width=50%}
+
+| Site Details    |  |    |
+|---------|:-----|
+| EPSG    | 26910 |
+| Res.    | 1 $m$ |
+| Cells   | 380,014 |
+| Area    | 0.38  $km^2$|
+| ARS     | 0.37   |
+
+| Elevation   |     |
+|---------|-----|
+| Min - Max | 188.61 - 415.64 $m$|
+| Range  | 227.03 $m$|
+| Mean | 282.1 $m$ |
+| Stddev | 56.1 |
+
+:::
+:::
+
+## Study Area - tx069-playas {transition="slide" transition-speed="medium" .smaller}
+
+
+:::{.columns}
+:::{.column width=50%}
+![](../output/tx069-playas//naip.png){width="45%"}
+![](../output/tx069-playas/elev.png){width="45%"}
+![](../output/tx069-playas/slope.png){width="45%"}
+![](../output/tx069-playas/aspect.png){width="45%"}
+:::
+:::{.column width=50%}
+
+| Site Details    |  |    |
+|---------|:-----|
+| EPSG    | 32613 |
+| Res.    | 8 $m$ |
+| Cells   | 5,378,306 |
+| Area    | 324.74  $km^2$|
+| ARS     | 0.07   |
+
+| Elevation   |     |
+|---------|-----|
+| Min - Max | 1104.0 - 1165.3 $m$|
+| Range  | 61.3 $m$|
+| Mean | 1134.9 $m$ |
+| Stddev | 13.13 |
+
+:::
+:::
+
+
+## Study Areas {transition="slide" transition-speed="medium" .smaller}
+
+:::{.columns}
 :::{.column width=40%}
-![](https://grass.osgeo.org/images/logos/grasslogo.svg){.r-stretch fig-align="center" width="50%"}
+| Site | ARS |
+|---------|:-----|
+| **tx069-playas** | 0.07 |
+| clay-center  | 0.13 |
+| SJER | 0.14  |
+| SFREC | 0.37  |
+| **Coweeta** | 5.5 |
+
+: {.striped .hover .responsive-sm}
+
 :::
 :::{.column width=60%}
-**Geospatial Processing Engine**
-
-- C and Python API
-- Open Source GPL v2
-- Parallelized (OpenMP)
-:::
-
-:::
-
-# What did we find? {transition="slide" transition-speed="medium" .smaller}
-Our results show that there is a strong relationship between particle density, spatial scale, and computational demands.
-We also identified optimal particle density ranges for different spatial scales and terrain types.
-
----
-
-## SJER - Mean Flow Depth {transition="slide" transition-speed="medium"}
-
-Particle Density: 4x
-
-::: {.r-hstack}
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-
-![1m](../output/SJER/sensitivity_1/SJER_depth_1_4_s_average.webp)
-
-:::
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![3m](../output/SJER/sensitivity_1/SJER_depth_3_4_s_average.webp)
-:::
-
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![5m](../output/SJER/sensitivity_1/SJER_depth_5_4_s_average.webp)
-:::
-
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![10m](../output/SJER/sensitivity_1/SJER_depth_10_4_s_average.webp)
-:::
-
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![30m](../output/SJER/sensitivity_1/SJER_depth_30_025_s_average.webp)
+![Coweeta](../output/coweeta/elevation_3dmap.png)
 :::
 :::
 
 
+## Preliminary Results {transition="slide" transition-speed="medium" .smaller}
 
-## SJER {auto-animate=true auto-animate-easing="ease-in-out"}
+**Evaluating**
 
+- SJER
+- Clay-Center
+
+
+## Compute Time {transition="slide" transition-speed="medium" .smaller}
+
+![](../output/agu2024_particles_run_time.png)
+
+> Particles have a greater impact on compute time than resolution.
+
+
+# Spatial Patterns of Overland Flow{auto-animate=true auto-animate-easing="ease-in-out"}
+## SJER - Mean Depth
+
+1m Resolution, Particle Density: 4x
 
 ::: {.r-hstack}
 ::: {data-id="box1" style=""}
 ![](../output/SJER/sensitivity_1/SJER_depth_1_4_s_average.webp){.r-stretch}
 :::
-
 ::: {data-id="box2" style=""}
-
 :::
-
 ::: {data-id="box3" style=""}
-
 :::
-
 ::: {data-id="box4" style=""}
 :::
-
 ::: {data-id="box5" style=""}
-
 :::
 ::: {data-id="box6" style=""}
-
 :::
 :::
 
 ## SJER {auto-animate=true auto-animate-easing="ease-in-out"}
+
+SJER - Mean Depth, 1m Resolution, Particle Density: 4x
+
 ::: {.r-hstack}
 ::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
 ![5 Min](../output/SJER/sensitivity_1/SJER_depth_1_4_s_05_average.png){width=200 hight=200}
@@ -290,46 +473,214 @@ Particle Density: 4x
 :::
 :::
 
-## Clay-Center - Mean Flow Depth {transition="slide" transition-speed="medium"}
-
-Particle Density:
+## SJER - Mean Flow Depth {transition="slide" transition-speed="medium" .smaller}
 
 ::: {.r-hstack}
+
+0.25x
+
 ::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
 
-![1m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_05_average.png)
+![1m](../output/SJER/sensitivity_1/SJER_depth_1_025_s_average.webp)
 
 :::
 ::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![3m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_10_average.png)
-:::
-
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![5m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_15_average.png)
-:::
-
-::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![10m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_20_average.png)
+![3m](../output/SJER/sensitivity_1/SJER_depth_3_025_s_average.webp)
 :::
 
 ::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
-![30m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_25_average.png)
+![5m](../output/SJER/sensitivity_1/SJER_depth_5_025_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/SJER/sensitivity_1/SJER_depth_10_025_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/SJER/sensitivity_1/SJER_depth_30_025_s_average.webp)
 :::
 :::
-
-## Test Slide
-
-![](../sim.gif)
-
-## Computaional Performance {auto-animate=true auto-animate-easing="ease-in-out"}
 
 ::: {.r-hstack}
-![](../output/SJER/sensitivity_1/SJER_run_time_res_line_plot.png)
 
-![](../output/SJER/sensitivity_1/SJER_mean_depth_res_line_plot.png)
+1x
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+
+![1m](../output/SJER/sensitivity_1/SJER_depth_1_1_s_average.webp)
+
 :::
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![3m](../output/SJER/sensitivity_1/SJER_depth_3_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![5m](../output/SJER/sensitivity_1/SJER_depth_5_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/SJER/sensitivity_1/SJER_depth_10_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/SJER/sensitivity_1/SJER_depth_30_1_s_average.webp)
+:::
+:::
+
+::: {.r-hstack}
+
+4.0x
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+
+![1m](../output/SJER/sensitivity_1/SJER_depth_1_4_s_average.webp)
+
+:::
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![3m](../output/SJER/sensitivity_1/SJER_depth_3_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![5m](../output/SJER/sensitivity_1/SJER_depth_5_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/SJER/sensitivity_1/SJER_depth_10_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/SJER/sensitivity_1/SJER_depth_30_4_s_average.webp)
+:::
+:::
+
+
+## Clay Center - Mean Depth {transition="slide" transition-speed="medium" .center .smaller}
+
+1m Resolution, Particle Density: 4x
+
+::: {.r-hstack}
+::: {data-id="box1" style=""}
+![](../output/clay-center/sensitivity_1/clay-center_depth_1_4_s_average.webp)
+
+:::
+::: {data-id="box2" style=""}
+:::
+::: {data-id="box3" style=""}
+:::
+::: {data-id="box4" style=""}
+:::
+::: {data-id="box5" style=""}
+:::
+::: {data-id="box6" style=""}
+:::
+:::
+
+
+
+
+## Clay Center - Mean Flow Depth {transition="slide" transition-speed="medium" .smaller}
+
+::: {.r-hstack}
+
+0.25x
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+
+![1m](../output/clay-center/sensitivity_1/clay-center_depth_1_025_s_average.webp)
+
+:::
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![3m](../output/clay-center/sensitivity_1/clay-center_depth_3_025_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![5m](../output/clay-center/sensitivity_1/clay-center_depth_5_025_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/clay-center/sensitivity_1/clay-center_depth_10_025_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/clay-center/sensitivity_1/clay-center_depth_30_025_s_average.webp)
+:::
+:::
+
+::: {.r-hstack}
+
+1x
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+
+![1m](../output/clay-center/sensitivity_1/clay-center_depth_1_1_s_average.webp)
+
+:::
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![3m](../output/clay-center/sensitivity_1/clay-center_depth_3_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![5m](../output/clay-center/sensitivity_1/clay-center_depth_5_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/clay-center/sensitivity_1/clay-center_depth_10_1_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/clay-center/sensitivity_1/clay-center_depth_30_1_s_average.webp)
+:::
+:::
+
+::: {.r-hstack}
+
+4.0x
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+
+![1m](../output/clay-center/sensitivity_1/clay-center_depth_1_4_s_average.webp)
+
+:::
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![3m](../output/clay-center/sensitivity_1/clay-center_depth_3_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![5m](../output/clay-center/sensitivity_1/clay-center_depth_5_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![10m](../output/clay-center/sensitivity_1/clay-center_depth_10_4_s_average.webp)
+:::
+
+::: {data-id="box1" auto-animate-delay="0" style="width: 200px; height: 200px; margin: 10px;"}
+![30m](../output/clay-center/sensitivity_1/clay-center_depth_30_4_s_average.webp)
+:::
+:::
+
+## Clay Center - $3m$ 2x {transition="slide" transition-speed="medium" .center}
+
+
+![](../output/clay-center/sensitivity_1/clay-center_depth_3_2_s_average.webp)
+
+
+
+## Clay Center - $10m$ 2x {transition="slide" transition-speed="medium" .center}
+
+
+![](../output/clay-center/sensitivity_1/clay-center_depth_10_2_s_average.webp)
+
+
+## Site Depth Comparison
+
+![](../output/agu2024_minute_mean_resolution.png){width=45%}
+![](../output/agu2024_minute_max_resolution.png){width=45%}
 
 
 # What's next? {transition="slide" transition-speed="medium" .smaller}
-Our findings have implications for future users of the SIMWE model.
-We hope that our work will help optimize tradeoffs between accuracy and computational demand.
+
+- Add additional sites
+- Perform statistical analysis
+- Include avaliable depth/flow gauge data
+
+# Questions {transition="slide" transition-speed="medium" }

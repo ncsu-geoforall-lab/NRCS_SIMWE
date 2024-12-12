@@ -9,8 +9,8 @@ OUTPUT_STEP = 5  # SIMWE time step in minutes
 PROJECT_MAPSET = "sensitivity_1"
 OUTPUT_DIR = "output"
 SITE_PARAMS = [
-    {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
-    # {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
+    # {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
+    {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
     # {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
     # {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
     # {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
@@ -274,7 +274,7 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
     8	8x0.5	8x1	8x3	8x5	8x10	8x30
     16	16x0.5	16x1	16x3	16x5	16x10	16x30
     """
-    model_spatial_res_params = [1, 3, 5, 10, 30]  # meters
+    model_spatial_res_params = [3, 5, 10, 30]  # meters
     model_particle_density_scalar_params = [0.25, 0.5, 1, 2, 4]
     total_runs = len(model_spatial_res_params) * len(
         model_particle_density_scalar_params
