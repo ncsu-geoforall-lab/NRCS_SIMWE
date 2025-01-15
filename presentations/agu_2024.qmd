@@ -130,7 +130,7 @@ where $N$ is number of particles.
 
 ::: {.columns}
 :::{.column width=40%}
-![](https://grass.osgeo.org/images/logos/grasslogo.svg){.r-stretch fig-align="center" width="50%"}
+![](images/bitmap.svg){.r-stretch fig-align="center" width="50%"}
 
 
 :::
