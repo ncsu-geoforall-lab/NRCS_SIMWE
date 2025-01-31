@@ -3,17 +3,27 @@ import sys
 import subprocess
 import time
 
+# import concurrent.futures
+
+
 # Constants
 N_RUNS = 10  # How many times to run SIMWE with a different random seed
-OUTPUT_STEP = 5  # SIMWE time step in minutes
-PROJECT_MAPSET = "sensitivity_1"
+OUTPUT_STEP = 10  # SIMWE time step in minutes
+NITERATIONS = 120  # Number of iterations for the SIMWE model
+BASIN_THRESHOLD = 30000  # Threshold for extracting the largest basin
+PROJECT_MAPSET = "sensitivity_7"
 OUTPUT_DIR = "output"
+
+# Sensitivity Analysis Parameters
+SPATIAL_RESOLUTIONS = [1, 3, 10, 30]  # meters
+PARTICLE_DENSITY_SCALARS = [0.25, 0.5, 1, 2]  # cells x scalar = particles
+
 SITE_PARAMS = [
-    # {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
+    {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
+    {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
     {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
-    # {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
-    # {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
-    # {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
+    {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
+    {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
 ]
 
 
@@ -104,6 +114,66 @@ def sample_random_point_envelope(n, time_steps):
     return df
 
 
+def threshold_label(threshold):
+    if 1000 <= threshold < 1000000:
+        return f"{threshold/1000:g}k"
+    return str(threshold)
+
+
+def extract_basins(elevation, threshold, **kwargs):
+    """Extract basins from the elevation raster"""
+
+    threshold_str = threshold_label(threshold)
+    res = kwargs.get("res", 1)
+
+    basins = f"basins{threshold_str}_{res}"
+    # flowaccum = f"flowaccum{threshold_str}_{res}"
+    drain_dir = f"drain_dir{threshold_str}_{res}"
+    streams = f"streams{threshold_str}_{res}"
+    gs.run_command(
+        "r.watershed",
+        elevation=elevation,
+        threshold=threshold,
+        # accumulation=flowaccum,
+        drainage=drain_dir,
+        basin=basins,
+        overwrite=True,
+        memory=10000,
+    )
+
+    gs.run_command(
+        "r.stream.extract",
+        elevation=elevation,
+        threshold=threshold,
+        stream_vector=streams,
+        overwrite=True,
+    )
+    gs.run_command(
+        "r.to.vect", input=basins, output=basins, type="area", overwrite=True
+    )
+    json_data = gs.parse_command(
+        "r.report",
+        map=basins,
+        units="kilometers,cells,percent",
+        sort="desc",
+        format="json",
+        flags="n",
+    )
+    output_basin = f"{basins}_largest"
+    if json_data["categories"] and len(json_data["categories"]) > 0:
+        largest_basin = json_data["categories"][0]
+        output_basin = f"{basins}_largest"
+        expression = f"{output_basin} = if({basins} == {largest_basin['category']}, 1, null())"  # noqa: E501
+        gs.run_command("r.mapcalc", expression=expression, overwrite=True)  # noqa: E501
+    else:
+        print(
+            f"No basins found with threshold {threshold} and resolution {res}"
+        )  # noqa: F821
+        output_basin = elevation
+
+    return output_basin
+
+
 def plot_envelope_curve(df_samples):
     """Plot the envelope curve"""
     import seaborn as sns
@@ -137,18 +207,18 @@ def get_simwe_time_steps(search_pattern):
     return sorted(list(set(time_steps_filtered)))
 
 
-def envelope_curve(site, res, scalar):  # noqa: E501
+def envelope_curve(site, simtype, res, scalar):  # noqa: E501
 
     # Methods used by r.series
     methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"  # noqa: E501
     scalar_str = str(scalar).replace(".", "")
-    time_steps = get_simwe_time_steps(f"depth_{res}_{scalar_str}_*.*")
+    time_steps = get_simwe_time_steps(f"{simtype}_{res}_{scalar_str}_*.*")
     print(f"Time Steps: {time_steps}")
     # Iterate over the time steps from simwe output
     for step in time_steps:
 
         # Get list of maps for the current time step
-        search_pattern = f"depth_{res}_{scalar_str}_*.{step}"
+        search_pattern = f"{simtype}_{res}_{scalar_str}_*.{step}"
         depth_list = gs.read_command(
             "g.list",
             type="raster",
@@ -159,12 +229,12 @@ def envelope_curve(site, res, scalar):  # noqa: E501
         # Calculate the envelop for depth maps
         series_outputs = ",".join(
             [
-                f"depth_{res}_{scalar_str}_s_{step}_{m}"
+                f"{simtype}_{res}_{scalar_str}_s_{step}_{m}"
                 for m in methods.split(",")  # noqa: E501
             ]
         )
         if depth_list:
-            print(f"Time step {step} has {len(depth_list.split(','))} maps")
+            print(f"Output step {step} has {len(depth_list.split(','))} maps")
             gs.run_command(
                 "r.series",
                 input=depth_list,
@@ -177,7 +247,7 @@ def envelope_curve(site, res, scalar):  # noqa: E501
             depth_simwe_methods = "average,median,minimum,maximum"
             depth_series_outputs = ",".join(
                 [
-                    f"depth_{res}_{scalar_str}_s_{step}_{m}"
+                    f"{simtype}_{res}_{scalar_str}_s_{step}_{m}"
                     for m in depth_simwe_methods.split(",")
                 ]
             )
@@ -209,18 +279,18 @@ def envelope_curve(site, res, scalar):  # noqa: E501
         depth_list_avg = gs.read_command(
             "g.list",
             type="raster",
-            pattern=f"depth_{res}_{scalar_str}_s_*_{method}",
+            pattern=f"{simtype}_{res}_{scalar_str}_s_*_{method}",
             separator="comma",  # noqa: E501
         ).strip()
 
-        strds_name = f"depth_{res}_{scalar_str}_s_{method}"
+        strds_name = f"{simtype}_{res}_{scalar_str}_s_{method}"
         gs.run_command(
             "t.create",
             output=strds_name,
             type="strds",
             temporaltype="absolute",
-            title=f"{method} Runoff Depth",
-            description="Runoff Depth in [m]",
+            title=f"{method} Runoff {simtype}",
+            description=f"Runoff {simtype} in [m]",
             overwrite=True,
         )
 
@@ -274,11 +344,8 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
     8	8x0.5	8x1	8x3	8x5	8x10	8x30
     16	16x0.5	16x1	16x3	16x5	16x10	16x30
     """
-    model_spatial_res_params = [3, 5, 10, 30]  # meters
-    model_particle_density_scalar_params = [0.25, 0.5, 1, 2, 4]
-    total_runs = len(model_spatial_res_params) * len(
-        model_particle_density_scalar_params
-    )
+
+    total_runs = len(SPATIAL_RESOLUTIONS) * len(PARTICLE_DENSITY_SCALARS)
     run_n = 0
     print("Running the sensitivity analysis...")
     output_file = f"./output/{project_name}/{PROJECT_MAPSET}/sensitivity_analysis_1.csv"  # noqa: E501
@@ -288,8 +355,14 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
         f.write("site_name,resolution,scalar,cells,particles,run_n,run_time\n")
         f.flush()
         # Iterate over the model resolution parameters
-        for res in model_spatial_res_params:
+        for res in SPATIAL_RESOLUTIONS:
             run_n += 1
+            try:
+                gs.run_command("r.mask", flags="r")
+            except Exception as e:
+                print(e)
+                pass
+
             gs.run_command(
                 "g.region", raster=elevation, res=res, flags="a", quiet=True
             )  # noqa: E501
@@ -302,8 +375,20 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
                 output=resampled_elevation,
                 method="bilinear",
                 overwrite=True,
-                nprocs=6,
+                nprocs=24,
                 quiet=True,
+            )
+
+            basin = extract_basins(resampled_elevation, BASIN_THRESHOLD)
+
+            # Set the region to the extent of the largest basin
+            gs.run_command(
+                "g.region",
+                raster=basin,
+                zoom=basin,
+                res=res,
+                flags="a",
+                quiet=True,  # noqa: E501
             )
 
             # Calculate dx and dy
@@ -324,11 +409,11 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
             )
 
             # Iterate over the particle density scalar parameters
-            for scalar in model_particle_density_scalar_params:
+            for scalar in PARTICLE_DENSITY_SCALARS:
                 run_n += 1
                 print(f"Progress: {run_n}/{total_runs}", end="\r")
                 # Calculate the number of particles
-                cells = cell_count(resampled_elevation)
+                cells = cell_count(basin)
                 particles = calculate_particle_density(cells, scalar)
                 print(
                     f"Resolution: {res}, Cells: {cells}, Particles: {particles}"  # noqa: E501
@@ -337,6 +422,7 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
                 # Run monte carlo simulation of the model
                 n_runs = 10
                 for i in range(n_runs):
+                    gs.run_command("r.mask", raster=basin, overwrite=True)
                     scalar_str = str(scalar).replace(".", "")
                     depth_x = f"{depth}_{res}_{scalar_str}_{i}"
                     dish_y = f"{disch}_{res}_{scalar_str}_{i}"
@@ -358,20 +444,24 @@ def sensitivity_analysis(project_name, elevation, dx, dy, depth, disch):
                         f"{project_name},{res},{scalar},{cells},{particles},{i},{run_time}\n"  # noqa: E501
                     )
                     f.flush()
+
+                    # Remove mask or else r.series will fail to use parallel
+                    # processing and then throw an error.
+                    gs.run_command("r.mask", flags="r")
+
                     # Calculate the statistics of the depth and discharge maps
                     strds_stats_maps(strds_depth, f"{strds_depth}_stats")
                     strds_stats_maps(strds_disch, f"{strds_disch}_stats")
 
-                envelope_curve(project_name, res, scalar)
+                envelope_curve(project_name, "depth", res, scalar)
+                envelope_curve(project_name, "disch", res, scalar)
 
 
 def simwe(
     elevation, dx, dy, depth, disch, particles, res, scalar, error, **kwargs
 ):  # noqa: E501
     """Run the SIMWE model"""
-    niterations = 30
     random_seed = kwargs.get("random_seed", None)
-    OUTPUT_STEP = 5  # minutes
     print(
         f"""
         Running the SIMWE model: Res:{res}, Scalar:{scalar}, Seed:{random_seed}
@@ -387,13 +477,13 @@ def simwe(
         infil_value=0.0,  # mm/hr
         man_value=0.1,
         nwalkers=particles,
-        niterations=niterations,  # event duration (minutes)
+        niterations=NITERATIONS,  # event duration (minutes)
         output_step=OUTPUT_STEP,  # minutes
         depth=depth,  # m
         discharge=disch,  # m3/s
         random_seed=random_seed,  # Selct a distinct random seed
         error=error,  # m
-        nprocs=30,
+        nprocs=1,
         flags="t",
         overwrite=True,
     )
