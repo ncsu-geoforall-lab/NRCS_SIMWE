@@ -169,7 +169,13 @@ def extract_basins(elevation, threshold, **kwargs):
         print(
             f"No basins found with threshold {threshold} and resolution {res}"
         )  # noqa: F821
-        output_basin = elevation
+
+        # No run as of sensitivity_7 but this is used in the watershed analysis
+        # where the largest basin is used to set the region of the elevation
+        # layer because the threshold was to big.
+        # output_basin = f"{basins}_largest"
+        # expression = f"{output_basin} = if({elevation}, 1, null())"  # noqa: E501
+        # gs.run_command("r.mapcalc", expression=expression, overwrite=True)  # noqa: E501
 
     return output_basin
 

@@ -1,0 +1,107 @@
+[
+  {
+    "category": -2147483648,
+    "label": "no data",
+    "resolution": 1,
+    "site": "tx069-playas",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 163.57139999999998
+      },
+      {
+        "unit": "cell counts",
+        "value": 181746
+      },
+      {
+        "unit": "% cover",
+        "value": 47.44285848534525
+      }
+    ]
+  },
+  {
+    "category": 6,
+    "label": "",
+    "resolution": 1,
+    "site": "tx069-playas",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 67.7349
+      },
+      {
+        "unit": "cell counts",
+        "value": 75261
+      },
+      {
+        "unit": "% cover",
+        "value": 19.646082843449477
+      }
+    ]
+  },
+  {
+    "category": 8,
+    "label": "",
+    "resolution": 1,
+    "site": "tx069-playas",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 49.2921
+      },
+      {
+        "unit": "cell counts",
+        "value": 54769
+      },
+      {
+        "unit": "% cover",
+        "value": 14.296864395276232
+      }
+    ]
+  },
+  {
+    "category": 4,
+    "label": "",
+    "resolution": 1,
+    "site": "tx069-playas",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 33.6339
+      },
+      {
+        "unit": "cell counts",
+        "value": 37371
+      },
+      {
+        "unit": "% cover",
+        "value": 9.755301709285693
+      }
+    ]
+  },
+  {
+    "category": 2,
+    "label": "",
+    "resolution": 1,
+    "site": "tx069-playas",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 30.5433
+      },
+      {
+        "unit": "cell counts",
+        "value": 33937
+      },
+      {
+        "unit": "% cover",
+        "value": 8.858892566643346
+      }
+    ]
+  }
+]

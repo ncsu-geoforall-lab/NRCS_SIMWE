@@ -1,0 +1,23 @@
+[
+  {
+    "category": -2147483648,
+    "label": "no data",
+    "resolution": 1,
+    "site": "SFREC",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 0.585
+      },
+      {
+        "unit": "cell counts",
+        "value": 650
+      },
+      {
+        "unit": "% cover",
+        "value": 100
+      }
+    ]
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "category": -2147483648,
+    "label": "no data",
+    "resolution": 1,
+    "site": "coweeta",
+    "threshold": 30000,
+    "units": [
+      {
+        "unit": "square kilometers",
+        "value": 57.455999999999996
+      },
+      {
+        "unit": "cell counts",
+        "value": 63840
+      },
+      {
+        "unit": "% cover",
+        "value": 100
+      }
+    ]
+  }
+]
