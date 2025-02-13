@@ -111,8 +111,6 @@ Run the python script `scripts/simulation.py` to downlaod data and run the SIMWE
 (venv) $ python scripts/simulation.py
 ```
 
-## License
-
 ## Acknowledgements
 
 This project is supported by the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and North Carolina State University.

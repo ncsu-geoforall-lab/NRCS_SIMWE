@@ -1,13 +1,134 @@
 ---
-title: "SIMWE - NRCS"
+title: "SIMWE - USDA NRCS"
+about:
+  template: marquee
+  image: notebooks/output/clay-center_depth_1_1_s_range.gif
+  links:
+    - icon: github
+      text: Github
+      href: https://github.com/ncsu-geoforall-lab/NRCS_SIMWE/
 listing:
+    type: grid
     contents:
-        # - content/notebooks
-        -   presentations
+        - notebooks\*.qmd
+        - presentations
+        - scripts\*.qmd
+        - output
         # - content/workshops
     sort: "date desc"
-    type: default
     categories: true
 page-layout: full
 title-block-banner: false
 ---
+
+## Purpose
+
+The purpose of this agreement, between the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and [North Carolina State University](https://ncsu.edu) (Recipient), is to adapt the SIMulation of Water and Erosion (SIMWE) model for the integration of Dynamic Soil Survey data. Proposed work will expand model capabilities, add supporting modules, and incorporate data input flexibility for integrating soil survey data. The updated model will serve as an important component of the future Dynamic Soil Survey at field to watershed scales and minute to monthly time-steps.
+
+## Objectives
+
+1. [WIP] Develop pre-processing modules to translate basic soil properties and site conditions into model input parameters.
+2. [WIP] Perform a sensitivity analysis to identify optimal ranges of and interactions between model input parameters.
+3. [ ] Explore the capability of the model to accept and utilize time-varying inputs.
+4. [ ] Expand model capabilities to include multiple and consecutive rainfall events and account for antecedent conditions.
+5. [ ] Develop multilayer SIMWE model simulations that account for multiple subsurface soil layers.
+
+## Sites
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+### Clay Center
+
+![claycenter3d](output/clay-center/elevation_3dmap.png)
+
+- [x] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
+
+Report: [output/clay-center/report.md](output/clay-center/report.md)
+
+:::
+
+::: {.column width="50%"}
+
+### Coweeta
+
+![coweeta3d](output/coweeta/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
+
+Report: [output/coweeta/report.md](output/coweeta/report.md)
+
+:::
+
+:::
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+### SFREC
+
+![sfrec3d](output/SFREC/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
+
+Report: [output/SFREC/report.md](output/SFREC/report.md)
+
+:::
+
+::: {.column width="50%"}
+
+### SJER
+
+![sjer3d](output/SJER/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
+
+Report: [output/SJER/report.md](output/SJER/report.md)
+
+:::
+
+:::
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+### tx069-playas
+
+![tx0693d](output/tx069-playas/elevation_3dmap.png)
+
+- [X] Create site projects in GRASS GIS
+- [x] Run basic SIMWE simulation
+
+Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
+
+:::
+
+:::
+
+## Basic Model Simulations Comparison
+
+![basic_simwe](notebooks/output/depth_fig.png)
+
+## Data
+
+### Shared Goolge Drive
+
+[NRCS_SIMWE/site_data_workflows](https://drive.google.com/drive/folders/1VsauKpPnaPhKcRUykEgmGN7045xuhFu_?usp=drive_link)
+
+
+## Acknowledgements
+
+This project is supported by the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and North Carolina State University.
+
+## Contributors
+
+- Helena Mitasova (North Carolina State University)
+- Corey T. White (North Carolina State University)
+- Add your name here

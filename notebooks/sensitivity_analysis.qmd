@@ -1,0 +1,1021 @@
+---
+title: AGU Combined Analysis
+jupyter: python3
+---
+
+
+
+```{python}
+import os
+import subprocess
+import sys
+# import numpy as np
+import matplotlib.pyplot as plt
+from pprint import pprint
+from PIL import Image
+import pandas as pd
+import sqlite3
+from IPython.display import IFrame
+
+from SALib.analyze.sobol import analyze
+from SALib.sample.sobol import sample
+from SALib.test_functions import Ishigami
+import numpy as np
+import seaborn as sns
+
+# Ask GRASS GIS where its Python packages are.
+gisbase = subprocess.check_output(["grass", "--config", "path"], text=True).strip()
+os.environ["GISBASE"] = gisbase
+print(gisbase)
+
+# Ask GRASS GIS where its Python packages are.
+sys.path.append(
+    subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
+)
+
+# Import the GRASS GIS packages we need.
+import grass.script as gs
+
+# Import GRASS Jupyter
+import grass.jupyter as gj
+```
+
+```{python}
+class RasterStats:
+    def __init__(self, univar):
+        for key, value in univar.items():
+            setattr(self, key, value)
+
+
+class Site:
+    gisdb = os.path.join(os.getenv('HOME'), 'grassdata')
+    mapset = 'PERMANENT'
+    # scalars = [0.25, 0.5, 1, 2, 4]
+    # resolutions = [1, 3, 5, 10, 30]
+    resolutions = [1, 3, 10, 30]  # meters
+    scalars = [0.25, 0.5, 1, 2]  # cells x scalar = particles
+
+    # Series methods
+    methods = "average,median,minimum,maximum,stddev,range"
+
+    # 1st Order Togographic Derivative
+    elevation = "elevation"
+
+
+    hillshade = "hillshade@basic"
+
+    # 2nd Order Topographic Derivatives
+    slope = "slope@basic"
+    aspect = "aspect@basic"
+    pcurv = "pcurv@basic"
+    tcurv = "tcurv@basic"
+
+    # Terrain Morphology
+    geomorphons = "geomorphons"
+
+    # Terrain Ruggedness Index
+    tri = "tri"
+    ars = None
+
+    # Stats
+    univar = {}
+
+    def __init__(self, site):
+        self.naip_year = site['naip']
+        self.site = site['site']
+        self.epsg = site['crs']
+        self.resolution = site['res']
+        self.ortho = f"naip_{self.naip_year}_rgb@naip"
+        self.ndvi = f"naip_{self.naip_year}_ndvi@basic"
+
+        self._start_grass_session()
+
+    def _start_grass_session(self):
+        # gisdb = os.path.join(os.getenv('HOME'), 'grassdata')
+        gj.init(self.gisdb, self.site, self.mapset)
+        gs.run_command("g.region", flags='a', res=self.resolution, raster=self.elevation)
+
+    def __str__(self):
+        return f"Site: {self.site}, CRS: {self.epsg}, Resolution: {self.resolution}m, NAIP: {self.naip_year}"
+
+    def _scalars_as_strings(self):
+        scalar_strs = [str(scalar).replace(".", "") for scalar in self.scalars]
+        return scalar_strs
+
+    def univar_stats(self, input_map):
+        """Get raster statistics"""
+        # if self.univar.get(input_map):
+        #     return self.univar[input_map]
+
+        json_data = gs.parse_command('r.univar', map=input_map, flags='e', format='json')
+
+        self.univar[input_map] = RasterStats(json_data[0])
+
+        return self.univar[input_map]
+
+    def get_sim_info(self, map_name):
+        sim_info = gs.parse_command("r.info", map=map_name, format="json")
+        # print(sim_info['comments'])
+        metadata = sim_info['comments'].split('\n\n')[0]
+        parsed_info = metadata.replace('\n', ',').split(',')
+        parsed_dict = {item.split('=')[0].strip(): item.split('=')[1].strip() for item in parsed_info}
+        for key, value in parsed_dict.items():
+            try:
+                parsed_dict[key] = int(value) if value.isdigit() else float(value)
+            except ValueError:
+                pass  # Keep as string if conversion fails
+
+        parsed_dict['Location'] = sim_info['location']
+        parsed_dict['map_name'] = sim_info['map']
+        parsed_dict['Cells'] = sim_info['cells']
+
+        if sim_info['map'].startswith("depth"):
+            parsed_dict['Min Depth (m)'] = sim_info['min']
+            parsed_dict['Max Depth (m)'] = sim_info['max']
+        if sim_info['map'].startswith("disch"):
+            parsed_dict['Min Discharge (cms)'] = sim_info['min']
+            parsed_dict['Max Discharge (cms)'] = sim_info['max']
+
+        return parsed_dict
+
+    def _univar_stats_df(self, mapset, raster_list, res, scalar_str, method, ars):
+        df_metadata = self.fetch_sensitivity_analysis(mapset)
+        df_metadata['area_m2'] = df_metadata['cells'] * df_metadata['resolution'] ** 2
+        df_metadata['area_km2'] = df_metadata['area_m2'] / 1e6
+        # df_metadata["p_density"] = df_metadata["particles"] / df_metadata["cells"]
+        # df_metadata["error"] = 1.0 / np.sqrt(df_metadata["particles"])
+
+        df_grouped = (
+            df_metadata
+                .groupby(by=['resolution', 'scalar'])
+                .agg({
+                        'run_time': 'mean',
+                        # 'run_time': 'std',
+                        'particles': 'max',
+                        'cells': 'max',
+                        'area_km2': 'max',
+                        # 'p_density': 'max',
+                        # 'error': "mean"
+                    })
+                    .reset_index()
+        )
+        stats_list = []
+        for raster in raster_list.split(","):
+            gs.run_command("g.region", raster=raster, flags="a")
+            stats = gs.parse_command("r.univar", map=raster, format="json", flags="e")[0]
+
+
+            extra_stats = df_grouped.query(f"resolution == {res} and scalar == {scalar_str.replace('0', '0.')}")
+            stats["run_time"] = extra_stats["run_time"].values[0]
+            stats["particles"] = extra_stats["particles"].values[0]
+            stats["area_km2"] = extra_stats["area_km2"].values[0]
+            stats["resolution"] = res
+            stats["scalar"] = scalar_str
+            stats["minute"] = raster.split("_")[4]
+            stats["stat_type"] = method
+            stats["ars"] = ars
+            stats_list.append(stats)
+
+        return pd.DataFrame(stats_list)
+
+    def get_stdrs_rasters(self, input_strds):
+        raster_depth_list = gs.parse_command(
+            "t.rast.list",
+            input=input_strds,
+            format="json"
+        )
+        raster_depth_list= ",".join([m['name'] for m in raster_depth_list['data']])
+        return raster_depth_list
+
+    def depth_analysis(self, mapset, save_to_csv=False):
+        """Depth analysis"""
+        # methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"
+
+        dataframe_list = []
+        scalar_strs = self._scalars_as_strings()
+        for res in self.resolutions:
+            gj.init(self.gisdb, self.site, mapset)
+            ars_map = f"ars_{res}"
+            gs.run_command("g.region", raster=f"elevation_{res}", flags="a")
+            gs.run_command("r.tri", input=f"elevation_{res}", output=ars_map, size=13, processes=6, overwrite=True)
+            json_data = gs.parse_command('r.univar', map=ars_map, format='json')
+            ars = None
+            try:
+                ars = json_data[0]['mean']
+            except KeyError as e:
+                print(f"Error: {e}", json_data)
+                ars = float('nan')
+
+            for scalar_str in scalar_strs:
+                for method in self.methods.split(","):
+                    print(f"Processing: {self.site}: {res}, {scalar_str}, {method}")
+                    depth_average = f"depth_{res}_{scalar_str}_s_{method}"
+                    raster_depth_list=  self.get_stdrs_rasters(depth_average)
+                    depth_stats_df = self._univar_stats_df(mapset, raster_depth_list, res, scalar_str, method, ars)
+                    dataframe_list.append(depth_stats_df)
+
+        result_vertical = pd.concat(dataframe_list)
+        result_vertical["Location"] = self.site
+
+        # Normalize the error relative to the base case (e.g., scalar = 1)
+        # base_error = result_vertical[result_vertical["scalar"] == '1']["error"].values
+        # result_vertical["run_id"] = result_vertical['resolution'].astype(str) + "_" + result_vertical['scalar'].astype(str)
+        # result_vertical["normalized_error"] = result_vertical["error"] / base_error[0]
+        # result_vertical["p_density"] = result_vertical["particles"] / result_vertical["cells"]
+        if save_to_csv:
+            result_vertical.to_csv(os.path.join("../output", self.site, mapset, save_to_csv))
+        return result_vertical
+
+    def area(self, unit='m2'):
+        """Calculate area of site"""
+
+        resolution = float(self.resolution)
+
+        if unit == 'm2':
+            return (self.univar_stats(self.elevation).n * resolution**2)
+        if unit == 'km2':
+            return (self.univar_stats(self.elevation).n * resolution**2) / 1e6
+        if unit == 'acres':
+            return (self.univar_stats(self.elevation).n * resolution**2) / 4046.86
+        return None
+
+    def area_ruggedness_scale(self):
+        """Calculate area ruggedness scale"""
+        # if self.ars:
+        #     return self.ars
+
+        gs.run_command("r.tri", input=self.elevation, output=self.tri, size=15, processes=6, overwrite=True)
+        json_data = gs.parse_command('r.univar', map=self.tri, flags='e', format='json')
+        self.ars = json_data[0]['mean']
+        return self.ars
+
+    def fetch_sensitivity_analysis(self, mapset):
+        """Fetch sensitivity analysis results"""
+        # file_location = os.path.join("../output", self.site, mapset, 'metadata_analysis_1.csv')
+        # file_location = os.path.join("../output", self.site, mapset, 'metadata_depth_analysis_1.csv')
+        file_location = os.path.join("../output", self.site, mapset, 'sensitivity_analysis_1.csv')
+
+        # print(f"Reading sensitity analysis from: {file_location}")
+        if os.path.isfile(file_location):
+            df = pd.read_csv(file_location)
+            return df
+
+        return None
+
+    def get_single_simulation_info(self, mapset, output_type, res, scalar, run_id ):
+        gj.init(self.gisdb, self.site, mapset)
+        gs.run_command("g.region", raster=self.elevation, flags="a")
+        scalar_str = str(scalar).replace("0.", "0").replace(".0", "")
+        depth_average = f"{output_type}_sum_{res}_{scalar_str}_{run_id}"
+
+        # This could use t.rast.info
+        depth_strds_name =  self.get_stdrs_rasters(depth_average)
+        temp_list = []
+        for output_step_name in depth_strds_name.split(","):
+            run_info = self.get_sim_info(output_step_name)
+
+            # Rename Fields
+            run_info['Seed'] = run_id
+            run_info['Resolution (m)'] = res
+            run_info['scalar_str'] = scalar_str
+            run_info["Particle Scalar"] = scalar
+            run_info['Number of iterations (cells)'] = run_info.pop('time-serie iteration')
+            run_info['Mean flow velocity (m/s)'] = run_info.pop('mean vel.')
+            run_info['Time Step (s)'] = run_info.pop('written deltap')
+            run_info['Time at Step (s)'] = run_info['Time Step (s)'] * run_info['Number of iterations (cells)']
+            run_info['Time at Step (min)'] = run_info['Time at Step (s)'] / 60.0
+            run_info['Mean Source Rate (Rain Fall Excess) (m/s)'] = run_info.pop('mean source (si)')
+            # print(f"Run Info: {output_step_name}")
+            temp_list.append(run_info)
+
+        stats_df = pd.DataFrame(temp_list)
+            # for key, value in run_info.items():
+            #     print(f"{key}: {value}")
+                # df_sensitivity_analysis.at[index, key] = value
+
+        return stats_df
+
+def threshold_label(threshold):
+    if 1000 <= threshold < 1000000:
+        return f"{threshold/1000:g}k"
+    return str(threshold)
+
+def basin_threshold_estimate(cells, target_basin_cells):
+    num_basins = cells / target_basin_cells
+    print(f"Number of Basins: {num_basins}")
+    estimated_threshold = int(cells / num_basins)
+    return estimated_threshold
+
+output_dir = os.path.join("..", "output", "agu2024")
+```
+
+```{python}
+threshold = threshold_label(250)
+print(threshold)
+
+estimated_threshold = basin_threshold_estimate(1000000, 20000)
+print(estimated_threshold)
+```
+
+```{python}
+test_site = Site({"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021})
+stats_df = test_site.get_single_simulation_info('sensitivity_6', "disch", 1, "025", "1")
+stats_df.head(25)
+```
+
+```{python}
+SITE_PARAMS = [
+    {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
+    {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
+    {"site": "SFREC", "crs": "26910", "res": "1", "naip": 2022},
+    {"site": "SJER", "crs": "26911", "res": "1", "naip": 2022},
+    {"site": "tx069-playas", "crs": "32613", "res": "8", "naip": 2022},
+]
+
+def combine_simulations(mapset):
+    combined_df = []
+    for site_param in SITE_PARAMS:
+        site = Site(site_param)
+        try:
+            df_sensitivity_analysis = site.fetch_sensitivity_analysis(mapset)
+            for index, row in df_sensitivity_analysis.iterrows():
+                res = row['resolution']
+                scalar = row['scalar']
+                run_id = row['run_n']
+                print(f"Processing: {site.site}: {res}, {scalar}, {run_id}")
+                try:
+                    stats_df = site.get_single_simulation_info(mapset, "depth", res, scalar, run_id)
+                    stats_df['Compute Time (s)'] = row['run_time']
+                    stats_df['particles'] = row['particles']
+                    stats_df['Particle Density'] = row['scalar']
+                    # stats_df['Area (km2)'] = row['area_km2']
+                    combined_df.append(stats_df)
+                except Exception as e:
+                    print(f"Get Single SimBlock Error: {e}")
+                    pass
+        except Exception as e:
+            print(f"Error: {e}")
+            pass
+
+    return pd.concat(combined_df)
+
+def combine_dataframe(sensitivity_mapset):
+    combine_df = []
+    # sensitivity_mapset = 'sensitivity_1'
+    for site_param in SITE_PARAMS:
+        print(f"{'#' * 50}\n")
+        site = Site(site_param)
+        print(site)
+        # univar = site.univar_stats("elevation")
+        # print(f"""
+        #       Area (km2): {site.area(unit='km2')}
+        #       n: {univar.n}
+        #       Cells: {univar.cells}
+        #       Min: {univar.min} Max: {univar.max}
+        #       Range: {univar.range}
+        #       Mean: {univar.mean}
+        #       Median: {univar.median}
+        #       Std: {univar.stddev}
+        # """)
+        # ars = site.area_ruggedness_scale()
+        # print(f"ARS: {ars}")
+        # df_sensitivity_analysis = site.fetch_sensitivity_analysis(sensitivity_mapset)
+        # gj.init(os.path.join(os.getenv('HOME'), 'grassdata'), site.site, sensitivity_mapset)
+
+        # for index, row in df_sensitivity_analysis.iterrows():
+        #     print(row)
+        #     res = row['resolution']
+        #     scalar_str = str(row['scalar']).replace("0.", "0").replace(".0", "")
+        #     run_n = row['run_n']
+        #     depth_strds_name = f"depth_{res}_{scalar_str}_{run_n}.05"
+            # disch_strds_name = f"disch_sum_{res}_{scalar_str}_{run_n}.30"
+            # run_info = site.get_sim_info(depth_strds_name)
+            # for key, value in run_info.items():
+            #     df_sensitivity_analysis.at[index, key] = value
+            # if df_sensitivity_analysis is not None:
+            #     combine_df.append(df_sensitivity_analysis)
+
+        df = site.depth_analysis(sensitivity_mapset, save_to_csv='metadata_depth_analysis_1.csv')
+
+        if df is not None:
+            combine_df.append(df)
+
+        results = pd.concat(combine_df)
+
+    return results
+
+```
+
+```{python}
+results_df = combine_dataframe('sensitivity_7')
+```
+
+```{python}
+results_df.head(25)
+```
+
+```{python}
+model_runs_df = combine_simulations('sensitivity_7')
+model_runs_df.head()
+```
+
+```{python}
+model_runs_df.info()
+```
+
+```{python}
+total_sims = 4 * 4 * 10
+print(total_sims)
+total_maps = total_sims * 12 * 2
+total_rows = len(model_runs_df.index)
+print(total_maps, total_rows)
+# assert total_maps == total_rows
+```
+
+```{python}
+# model_runs_df.info()
+sns.pairplot(model_runs_df, hue="Resolution (m)", kind="scatter")
+```
+
+```{python}
+sns.pairplot(model_runs_df, hue="Location", kind="scatter")
+```
+
+```{python}
+
+grouped_results_df = (results_df.groupby(by=['resolution', 'scalar', 'Location', 'stat_type', 'minute'])
+        .agg({
+            'run_time': 'mean',
+            'particles': 'mean',
+            'cells': 'mean',
+            # 'area_km2': 'max',
+            # 'p_density': 'max',
+            # "minute": "mean",
+            'mean': "mean",
+            'ars': "mean",
+            # "std": "mean",
+            "max": "mean",
+            "min": "mean",
+            "stddev": "mean"
+        })
+        .reset_index()
+)
+
+grouped_results_df['log10(particles)'] = np.log10(grouped_results_df['particles'])
+grouped_results_df['log10(run_time)'] = np.log10(grouped_results_df['run_time'])
+grouped_results_df['log10(ars)'] = np.log10(grouped_results_df['ars'])
+grouped_results_df['run_time_min'] = grouped_results_df['run_time'] / 60.0
+grouped_results_df.head()
+```
+
+```{python}
+model_runs_df.info()
+
+# grouped_results_df['log10(particles)'] = np.log10(grouped_results_df['particles'])
+model_runs_df['log10(Compute Time (s))'] = np.log10(model_runs_df['Compute Time (s)'])
+# grouped_results_df['run_time_min'] = grouped_results_df['run_time'] / 60.0
+# grouped_results_df.head()
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=model_runs_df,
+    x="Resolution (m)",
+    y="log10(Compute Time (s))",
+    hue="Location",
+    style="Particle Density",
+    # size="scalar",
+    err_style="bars",
+    # errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+plt.xlabel("Resolution (m)", fontsize=26)
+plt.ylabel("log10(Compute Time (s))", fontsize=26)
+# plt.title("Resolution vs Run Time")
+plt.savefig(f"../output/compute_time_by_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+# model_runs_df['log10(run_time)'] = np.log10(model_runs_df['run_time'])
+sns.lineplot(
+    data=model_runs_df,
+    x="Particle Density",
+    y="log10(Compute Time (s))",
+    hue="Location",
+    style="Resolution (m)",
+    # size="AR",
+    err_style="bars",
+    # errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+# g = sns.JointGrid(data=model_runs_df, x="Particle Density", y="log10(run_time)", space=0)
+# g.plot_joint(sns.kdeplot,
+#              fill=True, clip=((0, 3), (-2.0, 3.0)),
+#              thresh=0, levels=100, cmap="rocket")
+# g.plot_marginals(sns.histplot, palette="rocket", hue="Location", alpha=1, bins=25, data=model_runs_df)
+plt.xticks([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2])
+plt.xlabel("Particle Density", fontsize=26)
+plt.ylabel("log10(Compute Time (s))", fontsize=26)
+plt.savefig(f"../output/compute_time_by_particle_density.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=model_runs_df,
+    x="Time at Step (min)",
+    y="Max Depth (m)",
+    hue="Location",
+    style="Resolution (m)",
+    size="Resolution (m)",
+    err_style="bars",
+    # errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+plt.xlabel("Time at Step (min)", fontsize=26)
+plt.ylabel("Max Depth (m)", fontsize=26)
+# plt.title("Simulation Time Step vs Max Water Depth")
+plt.savefig(f"../output/simulated_timestep_max_water_depth.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+g = sns.catplot(
+    data=model_runs_df,
+    x="Time at Step (min)",
+    y="Mean flow velocity (m/s)",
+    hue="Location",
+    col="Particle Density",
+    row="Resolution (m)",
+    palette="YlGnBu_d",
+    sharex=False,
+    sharey=False,
+    # errorbar="se",
+    kind="strip",
+    height=6, aspect=.75,
+)
+g.despine(left=True)
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=results_df,
+    x="resolution",
+    y="run_time",
+    hue="Location",
+    style="scalar",
+    # size="scalar",
+    err_style="bars", errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    # errorbar=('ci', 95),
+)
+plt.title("Resolution vs Run Time")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=results_df,
+    x="scalar",
+    y="run_time",
+    hue="Location",
+    style="resolution",
+    # size="scalar",
+    err_style="bars", #errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+plt.title("Particles Density vs Run Time")
+# plt.savefig(f"../output/agu2024_particles_run_time.png")
+```
+
+```{python}
+
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+# fig, ax = plt.subplots(figsize=(12, 8))
+sns.relplot(
+    data=results_df, x="resolution", y="run_time",
+    col="Location",
+    hue="Location", style="scalar",
+    kind="line"
+)
+
+
+# sns.lineplot(
+#     data=grouped_results_df,
+#     x="scalar",
+#     y="run_time",
+#     hue="site_name",
+#     style="resolution",
+#     # size="scalar",
+#     err_style="bars", #errorbar=("se", 2),
+#     palette="magma",
+#     markers=True,
+#     alpha=0.75,
+#     errorbar=('ci', 95),
+# )
+plt.title("Particles Density vs Run Time")
+```
+
+```{python}
+sns.relplot(
+    data=results_df, x="particles", y="run_time",
+    col="Location",
+    hue="Location", style="scalar",
+    kind="line"
+)
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+# sns.lineplot(
+#     data=grouped_results_df.query("stat_type == 'average'"),
+#     # x="p_density",
+#     x="ars",
+#     y="max",
+#     # y="run_time_min",
+#     hue="site_name",
+#     size="scalar",
+#     palette="crest_r",
+#     markers=True,
+#     # style='resolution',
+#     alpha=0.75,
+#     errorbar=('ci', 95)
+# )
+
+
+
+# ax2 = plt.twinx()
+
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average'"),
+    # x="p_density",
+    x="ars",
+    y="run_time",
+    # y="run_time_min",
+    hue="Location",
+    # size="resolution",
+    palette="magma",
+    markers=True,
+    style='resolution',
+    alpha=0.75,
+    errorbar=('ci', 95),
+    # ax=ax2
+)
+plt.xlabel("ARS", fontsize=26)
+plt.ylabel("Compute Time (s)", fontsize=26)
+# plt.title("Run time vs. ARS", fontsize=32)
+# plt.legend(title="Particle Density", fontsize=18)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1.25,1))
+# sns.move_legend(ax2, "upper left", bbox_to_anchor=(1.25,0.25))
+# ax2.set_ylabel("Resolution (m)", fontsize=26)
+
+# plt.savefig(os.path.join("../output", site, mapset, f'{site}_run_time_res_line_plot.png'))
+
+plt.savefig(f"../output/sensitivity7_run_time_ars_plot.png")
+plt.show()
+```
+
+```{python}
+# g = sns.JointGrid(data=grouped_results_df.query("stat_type == 'average'"), x="ars", y="run_time", space=0)
+# g.plot_joint(sns.kdeplot,
+#              fill=True, clip=((0, 3), (0, 200)),
+#              thresh=0, levels=100, cmap="rocket")
+# g.plot_marginals(sns.histplot, color="#03051A", alpha=1, bins=25)
+
+# Plot sepal width as a function of sepal_length across days
+g = sns.lmplot(
+    data=grouped_results_df.query("stat_type == 'average'"),
+    x="ars", y="run_time", hue="Location",
+    height=5
+)
+
+# Use more informative axis labels than are provided by default
+g.set_axis_labels("ARS", "Compute Time (Sec)")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.despine(fig, left=True, bottom=True)
+# scalar_ranking = ["I1", "SI2", "SI1", "VS2", "VS1", "VVS2", "VVS1", "IF"]
+
+
+sns.scatterplot(
+    # x="ars",
+    # y="run_time",
+    x="log10(ars)",
+    y="log10(run_time)",
+    hue="Location", size="resolution",
+    style="scalar",
+    # palette="ch:r=-.2,d=.3_r",
+    palette="magma",
+    # hue_order=clarity_ranking,
+    sizes=(10, 50), linewidth=0,
+    data=grouped_results_df.query("stat_type == 'average'"), ax=ax
+)
+
+# sns.regplot(
+#     data=grouped_results_df.query("stat_type == 'average' and Location == 'clay-center'"),
+#     x="ars",
+#     y="run_time",
+#     order=2,
+#     color="black",
+#     ci=95,
+#     scatter=False,
+#     line_kws=dict(linewidth=1, linestyle="--"),
+# )
+# sns.regplot(
+#     data=grouped_results_df.query("stat_type == 'average' and Location == 'coweeta'"),
+#     x="ars",
+#     y="run_time",
+#     order=2,
+#     color="black",
+#     ci=95,
+#     scatter=False,
+#     line_kws=dict(linewidth=1, linestyle="--"),
+# )
+# sns.regplot(
+#     data=grouped_results_df.query("stat_type == 'average' and Location == 'SJER'"),
+#     x="ars",
+#     y="run_time",
+#     order=2,
+#     color="black",
+#     ci=95,
+#     scatter=False,
+#     line_kws=dict(linewidth=1, linestyle="--"),
+# )
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.xlabel("ARS", fontsize=26)
+plt.ylabel("log10(Compute Time (Sec))", fontsize=26)
+plt.savefig(f"../output/sensitivity7_ars_run_time_loc_res_scalar_plot.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df,
+    x="log10(particles)",
+    y="log10(run_time)",
+    hue="Location",
+    # size="resolution",
+    style="resolution",
+    # weights="error",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+plt.xlabel("log10(Particles)", fontsize=26)
+plt.ylabel("log10(Compute Time (s))", fontsize=26)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+# plt.title("Particles vs Run Time")
+# plt.savefig(f"../output/agu2024_particles_run_time.png")
+plt.savefig(f"../output/particles_run_time.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df,
+    x="cells",
+    y="log10(particles)",
+    hue="Location",
+    style="scalar",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.title("Particles vs Resolution")
+# plt.savefig(f"../output/agu2024_particles_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average'"),
+    x="log10(particles)",
+    y="log10(run_time)",
+    hue="cells",
+    style="Location",
+    # size="scalar",
+    palette="magma_r",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+plt.xlabel("log10(Particles)", fontsize=26)
+plt.ylabel("log10(Compute Time (s))", fontsize=26)
+# plt.title("ARS vs log10(Run Time)")
+plt.savefig(f"../output/agu2024_ars_run_time.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average'"),
+    x="log10(particles)",
+    y="max",
+    hue="Location",
+    # style="minute",
+    palette="magma_r",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.title("log10(particles) by Max Depth")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average'"),
+    x=grouped_results_df.query("stat_type == 'average'")["minute"].astype(int),
+    y="mean",
+    hue="Location",
+    style="resolution",
+    size="resolution",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+# plt.title("Mean Depth by Output Step")
+plt.xlabel("Output Step (Minutes)", fontsize=26)
+plt.ylabel("Mean Depth (m)", fontsize=26)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.savefig(f"../output/agu2024_minute_mean_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'maximum'"),
+    x=grouped_results_df.query("stat_type == 'maximum'")["minute"].astype(int),
+    y="mean",
+    hue="Location",
+    size="resolution",
+    style="resolution",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+plt.xlabel("Output Step (Minutes)", fontsize=26)
+plt.ylabel("Maximum Depth (m)", fontsize=26)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+# plt.title("Maximum Depth by Output Step")
+plt.savefig(f"../output/agu2024_minute_max_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'minimum'"),
+    x=grouped_results_df.query("stat_type == 'minimum'")["minute"].astype(int),
+    y="mean",
+    hue="Location",
+    style="resolution",
+    size="resolution",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+# plt.title("Min Depth by Time Step")
+plt.xlabel("Output Step (Minutes)", fontsize=26)
+plt.ylabel("Minimum Depth (m)", fontsize=26)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.savefig(f"../output/agu2024_minute_min_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'stddev'"),
+    x=grouped_results_df.query("stat_type == 'stddev'")["minute"].astype(int),
+    y="mean",
+    hue="Location",
+    style="resolution",
+    size="resolution",
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+plt.title("Stddev Depth by Time Step")
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+plt.savefig(f"../output/agu2024_minute_std_resolution.png")
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("paper")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average' & Location == 'clay-center'"),
+    x=grouped_results_df.query("stat_type == 'average' & Location == 'clay-center'")["minute"].astype(int),
+    y="mean",
+    hue="resolution",
+    # style="resolution",
+    size="scalar",
+    palette="summer",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.lineplot(
+    data=grouped_results_df.query("stat_type == 'average' & Location == 'SJER'"),
+    x=grouped_results_df.query("stat_type == 'average' & Location == 'SJER'")["minute"].astype(int),
+    y="mean",
+    hue="resolution",
+    # style="scalar",
+    size="scalar",
+    palette="cool",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+plt.title("Min Depth by Time Step")
+plt.savefig(f"../output/agu2024_minute_average_scalar.png")
+```

@@ -1,0 +1,1070 @@
+---
+jupyter: python3
+---
+
+```{python}
+import os
+import subprocess
+import sys
+# import numpy as np
+import matplotlib.pyplot as plt
+from pprint import pprint
+from PIL import Image
+import pandas as pd
+import sqlite3
+from IPython.display import IFrame
+
+from SALib.analyze.sobol import analyze
+from SALib.sample.sobol import sample
+from SALib.test_functions import Ishigami
+import numpy as np
+import seaborn as sns
+
+# Ask GRASS GIS where its Python packages are.
+gisbase = subprocess.check_output(["grass", "--config", "path"], text=True).strip()
+os.environ["GISBASE"] = gisbase
+print(gisbase)
+
+# Ask GRASS GIS where its Python packages are.
+sys.path.append(
+    subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
+)
+
+# Import the GRASS GIS packages we need.
+import grass.script as gs
+
+# Import GRASS Jupyter
+import grass.jupyter as gj
+```
+
+```{python}
+gisdb = os.path.join(os.getenv('HOME'), 'grassdata')
+site = 'SJER'
+# site = 'clay-center'
+mapset = 'sensitivity_1'
+gj.init(gisdb, site, mapset)
+```
+
+```{python}
+gs.run_command('g.region', raster='elevation_1', flags='ap')
+gs.run_command('r.univar', map='elevation_1', flags='e')
+res = 1
+scalar = '4'
+raster = f'depth_{res}_{scalar}_s_30_average'
+errorMap = gj.Map()
+relief_map = f"elevation_{res}_relief"
+errorMap.d_shade(
+        color=f"depth_{res}_{scalar}_s_30_average",
+        shade=relief_map,
+        brighten=30,
+        overwrite=True,
+    )
+errorMap.d_legend(
+        title=f"Depth (m)",
+        raster=f"depth_{res}_{scalar}_s_30_average",
+        at=(5, 35, 84, 91),
+        flags="bsl",
+        fontsize=14,
+    )
+errorMap.d_barscale(at=(1, 5), flags="n")
+errorMap.show()
+```
+
+```{python}
+# !g.extension extension=r.tri
+# !g.extension extension=r.mapcalc.tiled
+```
+
+```{python}
+# Terrain Ruggedness Index
+gs.run_command("r.tri", input="elevation_1", output="tri_1", processes=4, overwrite=True)
+gs.run_command('r.univar', map='tri_1', flags='e')
+errorMap = gj.Map()
+errorMap.d_shade(
+        color="tri_1",
+        shade=relief_map,
+        brighten=30,
+        overwrite=True,
+    )
+errorMap.d_legend(
+        title=f"Terrain Ruggedness Index",
+        raster="tri_1",
+        at=(5, 35, 84, 91),
+        flags="bsl",
+        fontsize=14,
+    )
+# errorMap.d_text(text="30", size="18", at="80,80", color="black" , bgcolor="none")
+errorMap.d_barscale(at=(1, 5), flags="n")
+errorMap.show()
+```
+
+```{python}
+# !g.list type=raster mapset=basic
+!r.surf.area map=elevation units=kilometers
+```
+
+```{python}
+analysis_metadata = os.path.join("../output", site, mapset, 'sensitivity_analysis_1.csv')
+
+df_metadata = pd.read_csv(analysis_metadata)
+df_metadata['area_m2'] = df_metadata['cells'] * df_metadata['resolution'] ** 2
+df_metadata['area_km2'] = df_metadata['area_m2'] / 1e6
+df_metadata["p_density"] = df_metadata["particles"] / df_metadata["cells"]
+df_metadata["error"] = 1.0 / np.sqrt(df_metadata["particles"])
+df_metadata["tri"] = 0.028
+df_metadata.to_csv(os.path.join("../output", site, mapset, 'metadata_analysis_1.csv'))
+df_metadata.head(50)
+```
+
+```{python}
+df_grouped = (
+    df_metadata
+        .groupby(by=['resolution', 'scalar'])
+        .agg({
+            'run_time': 'mean',
+            'particles': 'mean',
+            'cells': 'max',
+            'area_km2': 'max',
+            'p_density': 'max',
+            'error': "mean"
+        })
+        .reset_index()
+)
+
+df_grouped.head(20)
+```
+
+```{python}
+df_grouped.info()
+```
+
+```{python}
+sns.color_palette("crest", as_cmap=True)
+sns.histplot(
+    data=df_metadata,
+    x="run_time",
+    hue="resolution",
+    weights="error",
+    bins=30,
+    log_scale=(True, False),
+    color="blue"
+)
+plt.xlabel("Run Time (s)")
+plt.ylabel("Frequency")
+# plt.legend(title="Particle Density")
+plt.title("Histogram of Run Time")
+plt.show()
+```
+
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=df_metadata,
+    x="p_density",
+    y="run_time",
+    hue="resolution",
+    palette="crest_r",
+    weights='error',
+    alpha=0.75,
+    errorbar=('ci', 95)
+)
+plt.xlabel("Particle Density", fontsize=26)
+plt.ylabel("Time (s)", fontsize=26)
+plt.title("Run time vs. Particles", fontsize=32)
+plt.legend(title="Particle Density", fontsize=18)
+plt.savefig(os.path.join("../output", site, mapset, f'{site}_run_time_res_line_plot.png'))
+
+# plt.savefig(f"../output/{site}/{mapset}/{site}_run_time_res_line_plot.png")
+plt.show()
+```
+
+
+```{python}
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+
+fig = plt.figure(figsize=(12, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+# Create a scatter plot
+sc = ax.scatter(
+    df_metadata['p_density'],
+    df_metadata['resolution'],
+    df_metadata['run_time'],
+    c=df_metadata['error'],
+    cmap='viridis',
+    alpha=0.75,
+    marker='o'
+)
+
+# Add color bar
+cbar = plt.colorbar(sc, ax=ax, pad=0.1)
+cbar.set_label('Compute Time (s)')
+
+# Set labels
+ax.set_xlabel('Particle Density')
+ax.set_ylabel('Spatial Resolution (m)')
+ax.set_zlabel('Compute Time (s)')
+
+# Reverse the order of the x-axis labels
+ax.invert_xaxis()
+
+# Set view angle
+ax.view_init(elev=20., azim=-35, roll=0)
+
+plt.title('3D Scatter Plot of Compute Time vs Particle Density and Spatial Resolution')
+plt.show()
+```
+
+```{python}
+sns.barplot(
+    df_grouped, #.query("resolution > 1"),
+    x="resolution",
+    y="run_time",
+    hue="scalar",
+    palette="crest_r",
+    # width=.4,
+    # palette="vlag"
+)
+```
+
+```{python}
+df_metadata_pivot = df_metadata.pivot_table(index="p_density", columns="resolution", values="run_time")
+sns.heatmap(
+    df_metadata_pivot,
+    annot=True,
+    fmt=".1f",
+    cmap="crest_r"
+)
+
+plt.ylabel("Particle Density")
+```
+
+```{python}
+!g.remove -f type=raster pattern="*_01m*"
+```
+
+```{python}
+def get_simwe_time_steps(search_pattern):
+    """Returns a list of time steps from the SIMWE output as """
+    timestep_list = gs.read_command(
+        "g.list",
+        type="raster",
+        pattern=search_pattern,
+        separator="comma",
+    ).strip()
+    # print(timestep_list)
+    time_steps = [str(t.split(".")[-1]) for t in timestep_list.split(",")]
+    # print(time_steps)
+    def filter_subset(x):
+        # print(x)
+        if "_01m" not in x:
+            return x
+
+    time_steps_filtered = filter(lambda x: filter_subset(x), time_steps)
+    return sorted(list(set(time_steps_filtered)))
+
+res = "30"
+scalar_str = "025"
+method = "average"
+methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"
+test_list =  get_simwe_time_steps(f"depth_{res}_{scalar_str}_*.*")
+print(test_list)
+```
+
+```{python}
+for step in test_list:
+    # print(step)
+    # Get list of maps for the current time step
+    search_pattern = f"depth_{res}_{scalar_str}_*.{step}"
+    depth_list = gs.read_command(
+        "g.list",
+        type="raster",
+        pattern=search_pattern,
+        separator="comma",  # noqa: E501
+    ).strip()
+
+    strds_name = f"depth_{res}_{scalar_str}_s_{method}"
+
+    if depth_list:
+        print(f"Time step {step} has {len(depth_list.split(','))} maps")
+        print(depth_list)
+
+        depth_simwe_methods = "average,median,minimum,maximum"
+        depth_series_outputs = ",".join(
+            [
+                f"depth_{res}_{scalar_str}_s_{step}_{m}"
+                for m in depth_simwe_methods.split(",")
+            ]
+        )
+        last_depth_time_step = depth_list.split(',')[-1]
+        print(f"last_depth_time_step: {last_depth_time_step}")
+        print(depth_series_outputs)
+
+
+```
+
+```{python}
+# !t.list type=strds where="mapset = 'sensitivity_1'"
+# depth_30_025_s_05_01m
+res = "30"
+scalar_str = "4" #"025"  0.5, 1, 2, 4
+method = "median"
+methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"
+# Average SWIME Simulation STRDS from 10 SIMWE simulations
+depth_average = f"depth_{res}_{scalar_str}_s_median"
+disch_average = f"discharge_{res}_{scalar_str}_s_average"
+
+# Single SWIME Simulation STRDS
+depth_single_run = f"depth_sum_{res}_{scalar_str}"
+disch_single_run = f"depth_sum_{res}_{scalar_str}"
+
+# def filter_subset(x):
+#     if "_01m" in x:
+#         return x
+
+# for method in methods.split(","):
+#     depth_average = f"depth_{res}_{scalar_str}_s_{method}"
+#     umaps=f"depth_30_{scalar_str}_s_05_01m_{method},depth_30_{scalar_str}_s_05_{method},depth_30_{scalar_str}_s_09_01m_{method},depth_30_{scalar_str}_s_09_{method},depth_30_{scalar_str}_s_14_01m_{method},depth_30_{scalar_str}_s_14_{method},depth_30_{scalar_str}_s_18_01m_{method},depth_30_{scalar_str}_s_18_{method},depth_30_{scalar_str}_s_23_01m_{method},depth_30_{scalar_str}_s_23_{method},depth_30_{scalar_str}_s_28_01m_{method},depth_30_{scalar_str}_s_28_{method}".split(",")
+#     remove_list = ",".join(filter(lambda x: filter_subset(x), umaps))
+#     print(remove_list)
+#     !t.unregister type=raster input={depth_average} maps={remove_list}
+#     !t.unregister type=raster maps={remove_list}
+
+# gs.run_command("t.info", input=depth_average)
+```
+
+```{python}
+df_grouped.query(f"resolution == 30 and scalar == {scalar_str.replace('0', '0.')}")["run_time"].values[0]
+```
+
+```{python}
+!t.rast.univar -e {depth_average}
+```
+
+```{python}
+def univar_stats_df(raster_list, res, scalar_str, method, ars):
+    stats_list = []
+    for raster in raster_list.split(","):
+        gs.run_command("g.region", raster=raster, flags="a")
+        stats = gs.parse_command("r.univar", map=raster, format="json", flags="e")[0]
+
+
+        extra_stats = df_grouped.query(f"resolution == {res} and scalar == {scalar_str.replace('0', '0.')}")
+        stats["run_time"] = extra_stats["run_time"].values[0]
+        stats["particles"] = extra_stats["particles"].values[0]
+        stats["area_km2"] = extra_stats["area_km2"].values[0]
+        stats["resolution"] = res
+        stats["scalar"] = scalar_str
+        stats["minute"] = raster.split("_")[4]
+        stats["stat_type"] = method
+        stats["ars"] = ars
+        stats_list.append(stats)
+
+    return pd.DataFrame(stats_list)
+
+# raster_depth_list = gs.read_command(
+#         "g.list", type="raster", pattern="depth_sum_*_*_*_stats_*", separator="comma"  # noqa: E501
+# ).strip()
+
+
+
+model_spatial_res_params = ["1", "3", "5", "10", "30"]  # meters
+model_particle_density_scalar_params = ["025", "05", "1", "2", "4"]
+methods = "average,median,minimum,min_raster,maximum,max_raster,stddev,range"
+dataframe_list = []
+for res in model_spatial_res_params:
+    ars_map = f"ars_{res}"
+    gs.run_command("g.region", raster=f"elevation_{res}", flags="a")
+    gs.run_command("r.tri", input=f"elevation_{res}", output=ars_map, size=5, processes=6, overwrite=True)
+    json_data = gs.parse_command('r.univar', map=ars_map, format='json')
+    ars = json_data[0]['mean']
+
+    for scalar_str in model_particle_density_scalar_params:
+        for method in methods.split(","):
+            depth_average = f"depth_{res}_{scalar_str}_s_{method}"
+            raster_depth_list = gs.parse_command(
+                "t.rast.list",
+                input=depth_average,
+                format="json"
+            )
+            raster_depth_list= ",".join([m['name'] for m in raster_depth_list['data']])
+            depth_stats_df = univar_stats_df(raster_depth_list, res, scalar_str, method, ars)
+            dataframe_list.append(depth_stats_df)
+            # depth_stats_df.head()
+
+result_vertical = pd.concat(dataframe_list)
+```
+
+```{python}
+# result_vertical["minute"] = result_vertical["minute"].astype(int)
+# Compute the error
+result_vertical["error"] = 1.0 / np.sqrt(result_vertical["particles"])
+
+# Normalize the error relative to the base case (e.g., scalar = 1)
+base_error = result_vertical[result_vertical["scalar"] == '1']["error"].values
+result_vertical["run_id"] = result_vertical['resolution'].astype(str) + "_" + result_vertical['scalar'].astype(str)
+result_vertical["normalized_error"] = result_vertical["error"] / base_error[0]
+result_vertical["p_density"] = result_vertical["particles"] / result_vertical["cells"]
+
+result_vertical.to_csv(os.path.join("../output", site, mapset, 'metadata_depth_analysis_1.csv'))
+```
+
+```{python}
+result_vertical.query("stat_type == 'average' and minute == '30'").head()
+```
+
+```{python}
+result_vertical.describe()
+```
+
+```{python}
+sns.scatterplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x="resolution",
+    y="mean",
+    size="error",
+    hue='run_time'
+)
+```
+
+```{python}
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x="resolution",
+    y="mean",
+    hue="scalar",
+    palette="crest_r",
+    alpha=0.75,
+    # ax=ax,
+    markers=True,
+    # kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Resolution (m)", fontsize=26)
+plt.ylabel("Depth (m)", fontsize=26)
+plt.title("SJER Mean depth vs. resolution", fontsize=32)
+plt.savefig(f"../output/{site}/{mapset}/{site}_mean_depth_res_line_plot.png")
+plt.show()
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x="resolution",
+    y="min",
+    hue="scalar",
+    palette="crest_r",
+    alpha=0.75,
+    # col="stat_type",
+    # row="stat_type",
+    # errorbar=('ci', 95),
+    markers=False,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Resolution (m)")
+plt.ylabel("Depth (m)")
+plt.title("SJER Average Min depth vs. resolution")
+plt.show()
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x="resolution",
+    y="max",
+    hue="scalar",
+    palette="crest_r",
+    alpha=0.75,
+    # col="stat_type",
+    # row="stat_type",
+    # errorbar=('ci', 95),
+    markers=True,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Resolution (m)")
+plt.ylabel("Depth (m)")
+plt.title("SJER Average Max depth vs. resolution")
+plt.show()
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type != 'max_raster' and stat_type != 'min_raster'"),
+    x="resolution",
+    y="mean",
+    hue="run_time",
+    palette="crest_r",
+    alpha=0.75,
+    col="scalar",
+    row="stat_type",
+    # errorbar=('ci', 95),
+    markers=True,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Resolution (m)")
+plt.ylabel("Depth (m)")
+plt.title("SJER Average Max depth vs. resolution")
+plt.show()
+```
+
+```{python}
+# sns.jointplot(
+#     data=result_vertical.query("stat_type == 'average'"),
+#     x="mean", y="run_time", hue="resolution",
+#     kind="kde"
+# )
+sns.displot(
+    result_vertical.query("stat_type == 'median'"),
+    col="scalar",
+    x="mean",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+
+sns.displot(
+    result_vertical.query("stat_type == 'median'"),
+    col="scalar",
+    x="min",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+
+sns.displot(
+    result_vertical.query("stat_type == 'median'"),
+    col="scalar",
+    x="max",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+
+sns.displot(
+    result_vertical.query("stat_type == 'median'"),
+    col="scalar",
+    x="stddev",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+
+sns.displot(
+    result_vertical.query("stat_type == 'median'"),
+    col="scalar",
+    x="range",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+```
+
+```{python}
+sns.displot(
+    result_vertical,
+    col="scalar",
+    row="stat_type",
+    x="range",
+    # x="run_time",
+    hue="resolution",
+    kind="kde",
+    palette="crest_r",
+)
+```
+
+```{python}
+sns.set_context("notebook")
+# sns.
+sns.scatterplot(
+    data=result_vertical, #.query("stat_type == 'average'"),
+    x="ars",
+    y="run_time",
+    # hue="resolution",
+    palette="crest_r",
+    alpha=0.5,
+    # size="run_time",
+    # col="scalar",
+    # row="resolution",
+    # row="stat_type",
+    # errorbar=('ci', 95),
+    # markers=True,
+    # kind="line",
+    # style="scalar"
+)
+
+plt.xlabel("Minutes")
+plt.ylabel("Depth (m)")
+plt.title("SJER Average Minimum depth")
+plt.show()
+```
+
+```{python}
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
+df = result_vertical.query("stat_type == 'average'")
+# Plot Mean Depth
+# ax1.plot(df["p_density"], df["mean"], 'g-', marker='o', label="Mean Depth")
+ax1 = sns.regplot(data=df, x="p_density", y="run_time", color="blue")
+ax1.set_xlabel("Number of Particles")
+ax1.set_ylabel("Mean Depth", color='b')
+
+# Plot Compute Time
+# ax2.plot(df["p_density"], df["run_time"], 'b-', marker='s', label="Compute Time")
+ax2 = sns.regplot(data=df, x="p_density", y="ars", color='orange')
+ax2.set_ylabel("Compute Time (seconds)", color='orange')
+
+plt.title("Mean Depth and Compute Time vs Particles")
+plt.show()
+
+```
+
+```{python}
+df_metadata_pivot = result_vertical.query("stat_type == 'average'").pivot_table(index="scalar", columns="resolution", values="range")
+sns.heatmap(
+    df_metadata_pivot,
+    annot=True,
+    fmt=".3f",
+    cmap="crest_r"
+)
+
+plt.ylabel("Particle Density")
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x=result_vertical.query("stat_type == 'average'")["minute"].astype(int),
+    y="max",
+    hue="resolution",
+    palette="crest_r",
+    alpha=0.5,
+    markers=True,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Minutes")
+plt.ylabel("Depth (m)")
+plt.title("Maximum Depth")
+plt.show()
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x=result_vertical.query("stat_type == 'average'")["minute"].astype(int),
+    y="range",
+    hue="resolution",
+    palette="crest_r",
+    alpha=0.5,
+    markers=True,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Minutes")
+plt.ylabel("Depth (m)")
+plt.title("Range Depth")
+plt.show()
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    x=result_vertical.query("stat_type == 'average'")["minute"].astype(int),
+    y="stddev",
+    hue="resolution",
+    palette="crest_r",
+    alpha=0.5,
+    markers=True,
+    kind="line",
+    style="scalar"
+)
+
+plt.xlabel("Minutes")
+plt.ylabel("Depth (m)")
+plt.title("Stddev")
+plt.show()
+```
+
+```{python}
+# sns.jointplot(
+#     data=result_vertical.query("stat_type == 'median'"),
+#     x=result_vertical.query("stat_type == 'median'")["minute"].astype(int),
+#     y="max",
+#     # hue="resolution",
+#     hue="ars",
+#     # xlim=[-5,34],
+#     kind="kde",
+#     palette="crest_r"
+# )
+# fig, ax = plt.subplots(figsize=(12, 8))
+sns.jointplot(
+    data=result_vertical.query("stat_type == 'median'"),
+    x=result_vertical.query("stat_type == 'median'")["minute"].astype(int),
+    y="max",
+    hue="resolution",
+    kind="kde",
+    palette="magma",
+)
+plt.xlabel("Time Step Minutes")
+plt.ylabel("Max Depth (m)")
+plt.savefig(f"../output/{site}/{mapset}/{site}_max_depth_res_joint_plot.png")
+
+```
+
+```{python}
+fig = plt.figure(figsize=(12, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+# Create a scatter plot
+sc = ax.scatter(
+    result_vertical.query("stat_type == 'median'")['ars'],
+    result_vertical.query("stat_type == 'median'")["minute"].astype(int),
+
+    result_vertical.query("stat_type == 'median'")['median'],
+    # df_metadata['resolution'],
+    # df_metadata['run_time'],
+    c=result_vertical.query("stat_type == 'median'")['p_density'],
+    cmap='viridis',
+    alpha=0.75,
+    marker='o'
+)
+
+# Add color bar
+cbar = plt.colorbar(sc, ax=ax, pad=0.1)
+cbar.set_label('Compute Time (s)')
+
+# Set labels
+ax.set_xlabel('Particle Density')
+ax.set_ylabel('Spatial Resolution (m)')
+ax.set_zlabel('Compute Time (s)')
+
+# Reverse the order of the x-axis labels
+ax.invert_xaxis()
+
+# Set view angle
+# ax.view_init(elev=20., azim=-35, roll=0)
+
+plt.title('3D Scatter Plot of Compute Time vs Particle Density and Spatial Resolution')
+plt.show()
+```
+
+```{python}
+# sns.histplot(
+#     data=result_vertical.query("stat_type == 'average'"),
+#     x="mean",
+#     hue="resolution"
+# )
+
+sns.histplot(
+    data=result_vertical.query("stat_type == 'median'"),
+    x="median",
+    hue="resolution"
+)
+```
+
+```{python}
+sns.relplot(
+    data=result_vertical.query("stat_type == 'average'"),
+    # x="particles",
+    x="p_density",
+    y="error",
+    hue="resolution",
+    palette="crest_r",
+    alpha=0.5,
+    markers=True,
+    kind="line",
+    style="resolution"
+)
+
+plt.xlabel("Particle Density")
+plt.ylabel("Error 1/sqrt(Particles)")
+plt.title("Clay Center Error vs. Particle Density")
+plt.show()
+```
+
+```{python}
+sns.histplot(
+    data=result_vertical.query("stat_type == 'median'"),
+    x="median",
+    hue="resolution",
+    element="poly",
+    stat="percent"
+)
+```
+
+```{python}
+from PIL import Image
+import imageio.v3 as iio
+import os
+
+def create_webp_animation(input_pngs, output_file, fps=60, loop=0):
+    # Get a sorted list of PNG files in the input folder
+    png_files = sorted(input_pngs)
+
+    if not png_files:
+        raise ValueError("No PNG files found in the specified folder.")
+
+    # Read images
+    images = [Image.open(png) for png in png_files]
+
+    # Save as animated WebP
+    iio.imwrite(
+        output_file,
+        [image for image in images],
+        plugin="pillow",
+        format="webp",
+        fps=fps,
+        loop=loop,
+    )
+
+    print(f"Animated WebP saved as {output_file}")
+
+def create_static_map(site, res, scalar, step, method):
+    PROJECT_MAPSET = "sensitivity_1"
+    # site = "clay-center"
+    output_image = f"../output/{site}/{PROJECT_MAPSET}/{site}_depth_{res}_{scalar}_s_{step}_{method}.png"
+    dem_map = gj.Map(
+        use_region=True,
+        height=600,
+        width=600,
+        filename=output_image,
+    )
+    relief_map = f"elevation_{res}_relief"
+
+
+    dem_map.d_shade(
+        color=f"depth_{res}_{scalar}_s_{step}_{method}",
+        shade=relief_map,
+        brighten=30,
+        overwrite=True,
+    )
+
+    # SJER
+    dem_map.d_legend(
+        title=f"Depth (m)",
+        raster=f"depth_{res}_{scalar}_s_{step}_{method}",
+        at=(10, 40, 82, 89),
+        flags="bs",
+        fontsize=14,
+    )
+    dem_map.d_barscale(at=(1, 12), flags="n")
+
+    # Clay Center
+    # dem_map.d_legend(
+    #     title=f"Depth (m)",
+    #     raster=f"depth_{res}_{scalar}_s_{step}_{method}",
+    #     at=(5, 35, 84, 91),
+    #     flags="bs",
+    #     fontsize=14,
+    # )
+    # dem_map.d_barscale(at=(1, 7), flags="n")
+
+    dem_map.d_text(text=f"{step}", size="18", at="80,80", color="black" , bgcolor="none")
+
+    return output_image
+
+def get_agg_simwe_time_steps(search_pattern):
+    """Returns a list of time steps from the SIMWE output as """
+    timestep_list = gs.read_command(
+        "g.list",
+        type="raster",
+        pattern=search_pattern,
+        separator="comma",
+    ).strip()
+    # print(timestep_list)
+    black_list = ["min_raster", "max_raster"]
+    time_steps = [
+        str(t.split("_")[-3]) if any(black in t for black in black_list) else str(t.split("_")[-2]) for t in timestep_list.split(",")]
+    # print(time_steps)
+    def filter_subset(x):
+        # print(x)
+        if "_01m" not in x:
+            return x
+
+    time_steps_filtered = filter(lambda x: filter_subset(x), time_steps)
+    return sorted(list(set(time_steps_filtered)))
+
+# create_static_map(site=None, res=res, scalar=scalar_str, step="14", method="average")
+```
+
+```{python}
+
+model_spatial_res_params = ["1", "3", "5", "10", "30"]  # meters
+model_particle_density_scalar_params = ["025", "05", "1", "2", "4"]
+methods = "average" #median,minimum,min_raster,maximum,max_raster,stddev,range"
+dataframe_list = []
+output_type = 'depth'
+for res in model_spatial_res_params:
+    gs.run_command("g.region", raster=f"elevation_{res}", flags="a")
+    for scalar_str in model_particle_density_scalar_params:
+        for method in methods.split(","):
+            depth_average = f"{output_type}_{res}_{scalar_str}_s_{method}"
+            raster_depth_list = gs.parse_command(
+                "t.rast.list",
+                input=depth_average,
+                format="json"
+            )
+            raster_depth_list= [m['name'] for m in raster_depth_list['data']]
+            output_pngs = []
+            time_steps = get_agg_simwe_time_steps(f"{output_type}_{res}_{scalar_str}_s_*_{method}")
+            # print(time_steps)
+            for step in time_steps:
+                output_png = create_static_map(site, res, scalar_str, step, method)
+                output_pngs.append(output_png)
+            # print(output_pngs)
+            create_webp_animation(output_pngs, f"../output/{site}/{mapset}/{site}_{output_type}_{res}_{scalar_str}_s_{method}.webp", fps=1, loop=0)
+            # create_static_map(site=None, res=res, scalar=scalar_str, step=, method)
+```
+
+```{python}
+vs_map = gj.InteractiveMap()
+vs_map.add_raster("elevation", opacity=0.8)
+vs_map.add_raster(f"depth_1_1_s_30_average", opacity=0.5)
+vs_map.add_layer_control()
+vs_map.show()
+```
+
+```{python}
+def sample_outlet(n, time_steps):
+    tmp_data = []
+    res = "1"
+    scalar_str = "4"
+    method= "median"
+    # gs.run_command("v.random", output="random_points", npoints=n, seed=8)
+    time_steps = get_agg_simwe_time_steps(f"depth_{res}_{scalar_str}_s_*_{method}")
+    for step in time_steps:
+        json_output = gs.parse_command("r.what", points="outlet", map=f"depth_{res}_1_s_{step}_median,depth_{res}_1_s_{step}_minimum,depth_{res}_1_s_{step}_maximum", format="json")
+        print(json_output[0])
+        new_json = {
+            "step": int(step),
+            "core": json_output[0][f"depth_{res}_1_s_{step}_minimum"]["value"],
+            "envelope": json_output[0][f"depth_{res}_1_s_{step}_maximum"]["value"],
+            "median": json_output[0][f"depth_{res}_1_s_{step}_median"]["value"]
+        }
+        tmp_data.append(new_json)
+
+    df = pd.DataFrame(tmp_data)
+    return df
+
+df_samples = sample_outlet(1, time_steps)
+```
+
+```{python}
+f, ax = plt.subplots(figsize=(11, 9))
+sns.lineplot(data=df_samples, x="step", y="core")
+sns.lineplot(data=df_samples, x="step", y="median", dashes=True)
+sns.lineplot(data=df_samples, x="step", y="envelope")
+plt.legend(["Core", "Median", "Envelope"])
+plt.show()
+```
+
+```{python}
+gisdb = os.path.join(os.getenv('HOME'), 'grassdata')
+# site = 'clay-center'
+# site = 'coweeta'
+# site = 'SJER'
+# site = 'SFREC'
+site = 'tx069-playas'
+PROJECT_MAPSET = 'sensitivity_7'
+gj.init(gisdb, site, PROJECT_MAPSET)
+```
+
+```{python}
+# Clay Center 3D
+# Perspective: 30
+# Height: 22
+# Z-exag 100
+# Tilt: 0
+# Direction: SW (235)
+# Light Direction: (235)
+# Light Height: 80
+
+def wave_animation_3d():
+    model_spatial_res_params = [1, 3, 10, 30] # ["1", "3", "5", "10", "30"]  # meters
+    model_particle_density_scalar_params = ["025", "05", "1", "2"] #["025", "05", "1", "2", "4"]
+    # model_particle_density_scalar_params = ["4"]
+
+    methods = "average" #median,minimum,min_raster,maximum,max_raster,stddev,range"
+    dataframe_list = []
+    output_type = 'depth'
+    for res in model_spatial_res_params:
+        gs.run_command("g.region", raster=f"elevation_{res}", flags="a")
+        for scalar_str in model_particle_density_scalar_params:
+            for method in methods.split(","):
+                depth_average = f"{output_type}_{res}_{scalar_str}_s_{method}"
+                raster_depth_list = gs.parse_command(
+                    "t.rast.list",
+                    input=depth_average,
+                    format="json"
+                )
+                raster_depth_list= [m['name'] for m in raster_depth_list['data']]
+                output_pngs = []
+                time_steps = get_agg_simwe_time_steps(f"{output_type}_{res}_{scalar_str}_s_*_{method}")
+                # print(time_steps)
+                for step in time_steps:
+                    raster_map = f"depth_{res}_{scalar_str}_s_{step}_{method}"
+                    output_image = f"../output/{site}/{PROJECT_MAPSET}/{site}_wave_depth_3d_{res}_{scalar_str}_s_{step}_{method}.png"
+                    elevation_3dmap = gj.Map3D(width=800, height=600, filename=output_image, use_region=True)
+
+                    # Full list of options m.nviz.image
+                    # https://grass.osgeo.org/grass83/manuals/m.nviz.image.html
+                    elevation_3dmap.render(
+                        elevation_map=raster_map,
+                        color_map=raster_map,
+                        mode="fine",
+                        resolution_fine=1,
+                        # perspective=20, # Clay-Center
+                        # position=0.10,0.91,
+                        # height=22, # Clay-Center
+                        perspective=20, # SJER
+                        # position=0.10,0.91,
+                        height=13, # SJER
+                        zexag=100,
+                        twist=0,
+                        focus="454,387,0", # SJER
+                        # focus="688,580,0",
+                        # bgcolor="255:255:255",
+                        # fringe=['ne','nw','sw','se'],
+                        # fringe_elevation=-0.5,
+                        # light_position="0.85,1.0,0.80",  # Clay-Center
+                        light_position="0.7,1.0,0.80", # SJER
+                        light_brightness=80,
+                        # light_ambient=20,
+                        # light_color="255:255:255",
+                        arrow_position=[100,50]
+                    )
+
+                    try:
+                        elevation_3dmap.overlay.d_legend(raster=raster_map, flags="l", at=(60, 94, 87, 92), title="Water depth [m]", font="sans")
+                    except:
+                        elevation_3dmap.overlay.d_legend(raster=raster_map, flags="", at=(60, 94, 87, 92), title="Water depth [m]", font="sans")
+
+                    output_pngs.append(output_image)
+
+                create_webp_animation(output_pngs, f"../output/{site}/{PROJECT_MAPSET}/{site}_wave_depth_3d_{res}_{scalar_str}_s_{method}.webp", fps=1, loop=0)
+
+wave_animation_3d()
+```
