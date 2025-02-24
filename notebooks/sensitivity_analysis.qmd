@@ -24,11 +24,6 @@ import numpy as np
 import seaborn as sns
 
 # Ask GRASS GIS where its Python packages are.
-gisbase = subprocess.check_output(["grass", "--config", "path"], text=True).strip()
-os.environ["GISBASE"] = gisbase
-print(gisbase)
-
-# Ask GRASS GIS where its Python packages are.
 sys.path.append(
     subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
 )

@@ -611,12 +611,7 @@ def main():
 
 
 if __name__ == "__main__":
-    gisbase = subprocess.check_output(
-        ["grass", "--config", "path"], text=True
-    ).strip()  # noqa: E501
-    os.environ["GISBASE"] = gisbase
-    # Set up GRASS GIS environment variables
-    gisbase = os.getenv("GISBASE")
+    # Define the GRASS GIS database directory
     gisdb = os.path.join(os.getenv("HOME"), "grassdata")
 
     # Ask GRASS GIS where its Python packages are.

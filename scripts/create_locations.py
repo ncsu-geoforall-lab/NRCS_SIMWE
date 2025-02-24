@@ -6,7 +6,6 @@ BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
 location_name = None
 projcrs = None
 gisdb = os.path.join(os.getenv("HOME"), "grassdata")
-print(f"GISDBASE: {gisdb}")
 
 with open("site-CRS-info.txt", "r") as file:
     data = file.readlines()
