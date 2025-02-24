@@ -95,20 +95,46 @@ pip install -r requirements.txt
 (venv) $ pre-commit install
 ```
 
-## Create Site Projects (Locations) in GRASS
+## Project Setup
 
-Run the python script `scripts/create_site_projects.py` to create site projects (locations) in GRASS GIS.
+1. Create Site Projects in GRASS
 
-```bash
-(venv) $ python scripts/create_site_projects.py
-```
+    Run the python script `scripts/create_locations.py` to create site projects in GRASS GIS.
 
-## Run SIMWE Model
+    ```bash
+    python scripts/create_locations.py
+    ```
+
+2. Download Data
+
+    Run the python script `scripts/download_data.py` to download data for the site projects.
+
+    ```bash
+    python scripts/download_data.py
+    ```
+
+3. Calcuate 1st and 2nd order derivatives
+
+    Run the python script `scripts/geomorphology.py` to calculate 1st and 2nd order derivatives.
+
+    ```bash
+    python scripts/calculate_derivatives.py
+    ```
+
+## Simulations
 
 Run the python script `scripts/simulation.py` to downlaod data and run the SIMWE model.
 
 ```bash
-(venv) $ python scripts/simulation.py
+python scripts/simulation.py
+```
+
+### Sensitivity Analysis
+
+Run the python script `scripts/sensitivity.py` to perform a sensitivity analysis.
+
+```bash
+python scripts/sensitivity.py
 ```
 
 ## Acknowledgements
