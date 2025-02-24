@@ -1,5 +1,9 @@
 ---
 jupyter: python3
+format: html
+author: Corey T. White
+execute:
+  freeze: auto
 ---
 
 ```{python}

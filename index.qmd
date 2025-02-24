@@ -10,10 +10,10 @@ about:
 listing:
     type: grid
     contents:
-        - notebooks\*.qmd
+        - notebooks
         - presentations
         - scripts\*.qmd
-        - output
+        - output\**\*.qmd
         # - content/workshops
     sort: "date desc"
     categories: true

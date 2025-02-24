@@ -26,7 +26,7 @@
 
 #     Soil Data Explorer: https://casoilresource.lawr.ucdavis.edu/sde/
 
-
+# https://github.com/usda-ars-ussl/rosetta-soil
 # Related R Packages:
 
 #     https://ncss-tech.github.io/aqp/articles/aqp-overview.html

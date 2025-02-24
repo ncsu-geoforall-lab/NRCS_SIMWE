@@ -1,0 +1,12 @@
+<!-- ---
+title: Project Reports
+listing: grid
+    content:
+        - clay-center/*.md
+        - coweeta/*.md
+        - SFREC/*.md
+        - SJER/*.md
+        - tx069-playas/*.md
+
+---
+ -->

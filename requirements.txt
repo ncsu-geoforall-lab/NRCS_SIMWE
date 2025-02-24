@@ -16,3 +16,5 @@ trame-vtk
 trame-vuetify
 pyvistaqt
 pyqt5
+nbformat
+nbclient

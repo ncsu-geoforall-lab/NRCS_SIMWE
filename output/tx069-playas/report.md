@@ -90,3 +90,16 @@ Simulation GIF: ![depth_simulation.gif](basic/depth_simulation.gif)
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
 | ![disch_spring_04](ground_water2/disch_springs_04.png) | ![disch_spring_08](ground_water2/disch_springs_08.png) | ![disch_spring_12](ground_water2/disch_springs_12.png) | ![disch_spring_16](ground_water2/disch_springs_16.png) | ![disch_spring_20](ground_water2/disch_springs_19.png)
+
+
+### Sensitivity Analysis
+
+#### Variable Basin Extents based on resolution
+
+![sensitivity_7/tx069-playas_basin_overlap.png](sensitivity_7/tx069-playas_basin_overlap.png)
+
+#### Variable Spatial Resolution based on watershed extent (30k) at resolution at output step 120
+
+| 1 m | 3 m | 10 m | 30 m
+| --- | --- | ---  | ---
+|![sensitivity_7/tx069-playas_depth_1_2_s_120_average.png](sensitivity_7/tx069-playas_depth_1_2_s_120_average.png)|![sensitivity_7/tx069-playas_depth_3_2_s_120_average.png](sensitivity_7/tx069-playas_depth_3_2_s_120_average.png)|![sensitivity_7/tx069-playas_depth_10_2_s_117_average.png](sensitivity_7/tx069-playas_depth_10_2_s_117_average.png)|![sensitivity_7/tx069-playas_discharge_1_2_s_118_average.png](sensitivity_7/tx069-playas_depth_30_2_s_118_average.png)

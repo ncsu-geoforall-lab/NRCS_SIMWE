@@ -1,9 +1,9 @@
 ---
 title: AGU Combined Analysis
 jupyter: python3
+execute:
+  freeze: auto
 ---
-
-
 
 ```{python}
 import os
