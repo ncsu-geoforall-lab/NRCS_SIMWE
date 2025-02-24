@@ -1,31 +1,40 @@
 import os
 import subprocess
+import sys
 
 BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
-# Extract the location name and PROJCRS from the data
-location_name = None
-projcrs = None
-gisdb = os.path.join(os.getenv("HOME"), "grassdata")
 
-with open("site-CRS-info.txt", "r") as file:
-    data = file.readlines()
-    for line in data:
 
-        location_name, projcrs = line.split(":")
+def main():
+    """Extract the location name and PROJCRS from the data file"""
 
-        # Check if location name and PROJCRS were found
-        if location_name is None:
-            print("Location name not found in the data")
-            exit(1)
+    with open("site-CRS-info.txt", "r") as file:
+        data = file.readlines()
+        for line in data:
 
-        if projcrs is None:
-            print("CRS: Not found")
-            exit(1)
+            location_name, projcrs = line.split(":")
 
-        # Create the GRASS GIS location
-        grass_command = f"grass -c EPSG:{projcrs.strip()} '{gisdb}/{location_name}' -e"  # noqa: E501
-        print(f"Creating location: {grass_command}")
-        process = subprocess.Popen(
-            grass_command, shell=True, stdout=subprocess.PIPE
-        )  # noqa: E501
-        process.wait()
+            # Check if location name and PROJCRS were found
+            if location_name is None:
+                print("Location name not found in the data")
+                exit(1)
+
+            if projcrs is None:
+                print("CRS: Not found")
+                exit(1)
+
+            # Create the GRASS GIS location
+            grass_command = f"grass -c EPSG:{projcrs.strip()} '{gisdb}/{location_name}' -e"  # noqa: E501
+            print(f"Creating location: {grass_command}")
+            process = subprocess.Popen(
+                grass_command, shell=True, stdout=subprocess.PIPE
+            )  # noqa: E501
+            process.wait()
+
+
+if __name__ == "__main__":
+    # Execute the main function
+    location_name = None
+    projcrs = None
+    gisdb = os.path.join(os.getenv("HOME"), "grassdata")
+    sys.exit(main())
