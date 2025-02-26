@@ -3,12 +3,14 @@ project:
   output-dir: docs
 website:
   navbar:
-    title: "SIMWE - NRCS"
+    title: "NCSU GeoForAll Lab SIMWE - NRCS"
     background: primary
     search: true
     left:
       - text: "Home"
         href: index.qmd
+      - text: "Reports"
+        href: output/project_reports.qmd
     tools:
       - icon: github
         menu:

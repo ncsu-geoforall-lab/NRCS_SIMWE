@@ -1,9 +1,16 @@
 ---
 jupyter: python3
-format: html
 author: Corey T. White
 execute:
+  eval: false
   freeze: auto
+date-modified: today
+format:
+  html:
+    toc: true
+    code-tools: true
+    code-copy: true
+    code-fold: false
 ---
 
 ```{python}
