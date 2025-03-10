@@ -91,7 +91,6 @@ Simulation GIF: ![depth_simulation.gif](basic/depth_simulation.gif)
 | --- | --- | --- | --- | ---
 | ![disch_spring_04](ground_water2/disch_springs_04.png) | ![disch_spring_08](ground_water2/disch_springs_08.png) | ![disch_spring_12](ground_water2/disch_springs_12.png) | ![disch_spring_16](ground_water2/disch_springs_16.png) | ![disch_spring_20](ground_water2/disch_springs_19.png)
 
-
 ### Sensitivity Analysis
 
 #### Variable Basin Extents based on resolution

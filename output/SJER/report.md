@@ -10,38 +10,36 @@
 * CRS: NAD83 / UTM zone 11N
 
 | Elevation | Elevation Histogram
-| --- | --- |
-| ![elev.png](elev.png) | ![elev_hist.png](elev_hist.png) |
+| --- | ---
+| ![elev.png](elev.png) | ![elev_hist.png](elev_hist.png)
 
 ### NAIP Imagery and Derived Products
 
 * NAIP: 2021
 
-| NAIP | NDVI |
-| --- | --- |
-| ![naip.png](naip.png) | ![ndvi.png](ndvi.png) |
+| NAIP | NDVI
+| --- | ---
+| ![naip.png](naip.png) | ![ndvi.png](ndvi.png)
 
 ### Second order topographic derivatives
 
-| Slope | Aspect | Geomorphon |
-| --- | --- | --- |
-| ![slope.png](slope.png) | ![aspect.png](aspect.png) | ![geomorphon.png](geomorphon.png) |
+| Slope | Aspect | Geomorphon
+| --- | --- | ---
+| ![slope.png](slope.png) | ![aspect.png](aspect.png) | ![geomorphon.png](geomorphon.png)
 
-| Profile Curvature | Planform Curvature |
-| --- | --- |
-| ![tcurv.png](tcurv.png) | ![pcurv.png](pcurv.png) |
-
+| Profile Curvature | Planform Curvature
+| --- | ---
+| ![tcurv.png](tcurv.png) | ![pcurv.png](pcurv.png)
 
 ### Soils
 
-| SSURGO MUKEY |
-| --- |
-| ![mukey.png](mukey.png) |
-
+| SSURGO MUKEY
+| ---
+| ![mukey.png](mukey.png)
 
 ## Simulations
 
-#### Base parameters
+### Base parameters
 
 #### Depth
 
@@ -71,24 +69,36 @@ Simulation GIF: ![depth_simulation.gif](basic/depth_simulation.gif)
 
 #### Depth - Simulated with groundwater seepage in streams no rainfall
 
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| ![depth_gw_04](ground_water2/depth_gw_04.png) | ![depth_gw_08](ground_water2/depth_gw_08.png) | ![depth_gw_12](ground_water2/depth_gw_12.png) | ![depth_gw_16](ground_water2/depth_gw_16.png) | ![depth_gw_20](ground_water2/depth_gw_20.png)
+| 4 Min | 8 Min | 12 Min
+| --- | --- | ---
+| ![depth_gw_04](ground_water2/depth_gw_04.png) | ![depth_gw_08](ground_water2/depth_gw_08.png) | ![depth_gw_12](ground_water2/depth_gw_12.png)
 
 #### Discharge - Simulated with groundwater seepage in streams no rainfall
 
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| ![disch_gw_04](ground_water2/disch_gw_04.png) | ![disch_gw_08](ground_water2/disch_gw_08.png) | ![disch_gw_12](ground_water2/disch_gw_12.png) | ![disch_gw_16](ground_water2/disch_gw_16.png) | ![disch_gw_20](ground_water2/disch_gw_20.png)
+| 4 Min | 8 Min | 12 Min
+| --- | --- | ---
+| ![disch_gw_04](ground_water2/disch_gw_04.png) | ![disch_gw_08](ground_water2/disch_gw_08.png) | ![disch_gw_12](ground_water2/disch_gw_12.png)
 
 #### Depth - Simulated with springs
 
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| ![depth_spring_04](ground_water2/depth_springs_04.png) | ![depth_spring_08](ground_water2/depth_springs_08.png) | ![depth_spring_12](ground_water2/depth_springs_12.png) | ![depth_spring_16](ground_water2/depth_springs_16.png) | ![depth_spring_20](ground_water2/depth_springs_20.png)
+| 4 Min | 8 Min | 12 Min
+| --- | --- | ---
+| ![depth_spring_04](ground_water2/depth_springs_04.png) | ![depth_spring_08](ground_water2/depth_springs_08.png) | ![depth_spring_12](ground_water2/depth_springs_12.png)
 
 #### Discharge - Simulated with springs
 
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| ![disch_spring_04](ground_water2/disch_springs_04.png) | ![disch_spring_08](ground_water2/disch_springs_08.png) | ![disch_spring_12](ground_water2/disch_springs_12.png) | ![disch_spring_16](ground_water2/disch_springs_16.png) | ![disch_spring_20](ground_water2/disch_springs_20.png)
+| 4 Min | 8 Min | 12 Min
+| --- | --- | ---
+| ![disch_spring_04](ground_water2/disch_springs_04.png) | ![disch_spring_08](ground_water2/disch_springs_08.png) | ![disch_spring_12](ground_water2/disch_springs_12.png)
+
+### Sensitivity Analysis
+
+#### Variable Basin Extents based on resolution
+
+![sensitivity_7/SJER_basin_overlap.png](sensitivity_7/SJER_basin_overlap.png)
+
+#### Variable Spatial Resolution based on watershed extent (30k) at resolution at output step 120
+
+| 1 m | 3 m | 10 m | 30 m
+| --- | --- | ---  | ---
+|![sensitivity_7/SJER_depth_1_2_s_030_average.png](sensitivity_7/SJER_depth_1_2_s_030_average.png)|![sensitivity_7/SJER_depth_3_2_s_120_average.png](sensitivity_7/SJER_depth_3_2_s_120_average.png)|![sensitivity_7/SJER_depth_10_2_s_070_average.png](sensitivity_7/SJER_depth_10_2_s_070_average.png)|![sensitivity_7/SJER_discharge_1_2_s_020_average.png](sensitivity_7/SJER_depth_30_2_s_020_average.png)
