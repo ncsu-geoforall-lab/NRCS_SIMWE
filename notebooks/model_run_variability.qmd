@@ -1,0 +1,234 @@
+
+# Exploring the spatial patterns of Gaussian Path Sampling
+
+File labeling structure
+
+`{site_name}_{depth|disch}_{resolution}_{particle density}_{seed}`
+
+## Mean Value
+
+The mean value shows the smoothed result of taking the mean output from 10 model runs. This in practice multiplies the number of particles used by 10 times.
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_prob.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_prob.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_prob.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_prob.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_prob.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_prob.webp)
+
+## Median Value
+
+The median smoothed results of taking the median output from 10 model runs. This in practice multiplies the number of particles used by 10 times.
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_median.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_median.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_median.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_median.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_median.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_median.gif)
+
+## Maximum Value
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_maximum.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_maximum.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_maximum.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_maximum.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_maximum.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_maximum.gif)
+
+## Minimum
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_minimum.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_minimum.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_minimum.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_minimum.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_minimum.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_minimum.gif)
+
+## Range
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_range.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_range.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_range.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_range.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_range.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_range.gif)
+
+## Standard Deviation
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_05_stddev.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_10_stddev.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_15_stddev.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_25_stddev.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_depth_1_1_s_30_stddev.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_depth_1_1_s_stddev.gif)
+
+## Max Raster
+
+These visualizations represent each walkers vairablilty due to SIMWEs use of the gaussian path sampling method for particles.
+Each color represents the output raster that contained the maximum values for the cell.
+
+All simulatation are run at $1 m$ resolution:
+
+<!-- ### 1_*_*_stats
+
+![Clay-Center Max Raster](output/depth_sum_1_*_*_stats_max_raster.gif) -->
+
+### 10 Seeds
+
+In this figure the output maximum depth rasters were created using `r.series` filtering the data based on the scheme `1_1_*`
+where 1 represents `1` meter spatial resolution, the particle density is `1`, so the number of paritcles is equal to the number of cells, and `*` is a wildcard for the seed that was used when executing `r.sim.water`.
+
+
+![Clay-Center Max Raster 2](output/depth_sum_1_1_*_stats_max_raster.gif)
+*Maximum Depth Output Variablity via Gaussian Path Sampling*
+
+### Variablility based on Particle Density
+
+Here the the outputs are all from the same seed with varibale particle density (`1_*_1`)
+
+![Clay-Center Max Raster 3](output/depth_sum_1_*_1_stats_max_raster.gif)
