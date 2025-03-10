@@ -2,7 +2,7 @@
 title: "SIMWE - USDA NRCS"
 about:
   template: marquee
-  image: notebooks/output/clay-center_depth_1_1_s_range.gif
+  # image: notebooks/output/clay-center_depth_1_1_s_range.gif
   links:
     - icon: github
       text: Github
