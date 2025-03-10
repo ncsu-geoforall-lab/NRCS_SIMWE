@@ -1,5 +1,5 @@
 ---
-title: AGU Combined Analysis
+title: Sensitivity Analysis
 jupyter: python3
 execute:
   eval: false
@@ -14,6 +14,9 @@ format:
 ---
 
 ```{python}
+#| echo: false
+#| eval: true
+
 import os
 import subprocess
 import sys
@@ -25,12 +28,16 @@ import pandas as pd
 import sqlite3
 from IPython.display import IFrame
 
-from SALib.analyze.sobol import analyze
-from SALib.sample.sobol import sample
-from SALib.test_functions import Ishigami
+# from SALib.analyze.sobol import analyze
+# from SALib.sample.sobol import sample
+# from SALib.test_functions import Ishigami
 import numpy as np
 import seaborn as sns
 
+
+```
+
+```{python}
 # Ask GRASS GIS where its Python packages are.
 sys.path.append(
     subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
@@ -41,9 +48,12 @@ import grass.script as gs
 
 # Import GRASS Jupyter
 import grass.jupyter as gj
+
 ```
 
 ```{python}
+#| echo: false
+#|
 class RasterStats:
     def __init__(self, univar):
         for key, value in univar.items():
@@ -313,6 +323,8 @@ output_dir = os.path.join("..", "output", "agu2024")
 ```
 
 ```{python}
+#| echo: false
+
 threshold = threshold_label(250)
 print(threshold)
 
@@ -321,12 +333,16 @@ print(estimated_threshold)
 ```
 
 ```{python}
-test_site = Site({"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021})
-stats_df = test_site.get_single_simulation_info('sensitivity_6', "disch", 1, "025", "1")
-stats_df.head(25)
+#| echo: false
+#|
+# test_site = Site({"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021})
+# stats_df = test_site.get_single_simulation_info('sensitivity_6', "disch", 1, "025", "1")
+# stats_df.head(25)
 ```
 
 ```{python}
+#| echo: false
+
 SITE_PARAMS = [
     {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},
     {"site": "coweeta", "crs": "26917", "res": "10", "naip": 2022},
@@ -409,43 +425,63 @@ def combine_dataframe(sensitivity_mapset):
 
 ```
 
+
+Combines the output from `r.univar` for each model output into a signle dataframe and *CSV* file for analysis.
+
 ```{python}
+#| echo: false
 results_df = combine_dataframe('sensitivity_7')
+results_df.to_csv(os.path.join("output", "combined_stats", 'combined_analysis_7.csv'))
 ```
 
 ```{python}
-results_df.head(25)
+#| echo: true
+#| eval: true
+
+results_df = pd.read_csv(os.path.join("output", "combined_stats", 'combined_analysis_7.csv'))
+results_df.info()
 ```
 
+Extracts the history of each model output step to get values returned by SIMWE.
+
 ```{python}
+#| echo: false
 model_runs_df = combine_simulations('sensitivity_7')
-model_runs_df.head()
+model_runs_df.to_csv(os.path.join("output", "combined_stats", 'combined_simulations_7.csv'))
+
 ```
 
 ```{python}
+#| echo: true
+#| eval: true
+
+model_runs_df = pd.read_csv(os.path.join("output", "combined_stats", 'combined_simulations_7.csv'))
 model_runs_df.info()
 ```
 
 ```{python}
+#| echo: false
 total_sims = 4 * 4 * 10
 print(total_sims)
 total_maps = total_sims * 12 * 2
 total_rows = len(model_runs_df.index)
+total_rows = len(model_runs_df.index)
 print(total_maps, total_rows)
-# assert total_maps == total_rows
+
 ```
 
 ```{python}
-# model_runs_df.info()
+#| eval: false
 sns.pairplot(model_runs_df, hue="Resolution (m)", kind="scatter")
 ```
 
 ```{python}
+#| eval: false
 sns.pairplot(model_runs_df, hue="Location", kind="scatter")
 ```
 
 ```{python}
-
+#| eval: true
 grouped_results_df = (results_df.groupby(by=['resolution', 'scalar', 'Location', 'stat_type', 'minute'])
         .agg({
             'run_time': 'mean',
@@ -472,6 +508,7 @@ grouped_results_df.head()
 ```
 
 ```{python}
+#| eval: true
 model_runs_df.info()
 
 # grouped_results_df['log10(particles)'] = np.log10(grouped_results_df['particles'])
@@ -481,6 +518,40 @@ model_runs_df['log10(Compute Time (s))'] = np.log10(model_runs_df['Compute Time 
 ```
 
 ```{python}
+#| label: fig-nwalk-init.walk
+#| fig-cap: "nwalk by init.walk"
+#| eval: true
+
+sns.set_theme(style="darkgrid")
+sns.set_context("talk")
+sns.color_palette("crest", as_cmap=True)
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.lineplot(
+    data=model_runs_df,
+    x="particles",
+    y="init.walk",
+    hue="Location",
+    style="Resolution (m)",
+    # size="scalar",
+    err_style="bars",
+    # errorbar=("se", 2),
+    palette="magma",
+    markers=True,
+    alpha=0.75,
+    errorbar=('ci', 95),
+)
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+plt.xlabel("nwalk", fontsize=26)
+plt.ylabel("init.walk", fontsize=26)
+# plt.title("Resolution vs Run Time")
+plt.savefig(f"../output/nwalk_init_walk.png")
+```
+
+```{python}
+#| label: fig-compute_v_resolution
+#| fig-cap: "Compute Time by Resolution"
+#| eval: true
+
 sns.set_theme(style="darkgrid")
 sns.set_context("talk")
 sns.color_palette("crest", as_cmap=True)
@@ -507,6 +578,10 @@ plt.savefig(f"../output/compute_time_by_resolution.png")
 ```
 
 ```{python}
+#| label: fig-compute_v_particle_density1
+#| fig-cap: "Compute Time by Particle Density"
+#| eval: true
+
 sns.set_theme(style="darkgrid")
 sns.set_context("talk")
 sns.color_palette("crest", as_cmap=True)
@@ -539,6 +614,10 @@ plt.savefig(f"../output/compute_time_by_particle_density.png")
 ```
 
 ```{python}
+#| label: fig-simulated_timestep_max_water_depth
+#| fig-cap: "Time Step by Max Depth"
+#| eval: true
+#|
 sns.set_theme(style="darkgrid")
 sns.set_context("talk")
 sns.color_palette("crest", as_cmap=True)
@@ -565,6 +644,10 @@ plt.savefig(f"../output/simulated_timestep_max_water_depth.png")
 ```
 
 ```{python}
+#| label: fig-compute_v_particle_density
+#| fig-cap: "Time at Step (min) by Mean flow velocity (m/s)"
+#| eval: true
+
 sns.set_theme(style="darkgrid")
 sns.set_context("paper")
 sns.color_palette("crest", as_cmap=True)
@@ -629,7 +712,9 @@ plt.title("Particles Density vs Run Time")
 ```
 
 ```{python}
-
+#| label: fig-particle_density_v_run_time
+#| fig-cap: "Particles Density vs Run Time"
+#| eval: true
 sns.set_theme(style="darkgrid")
 sns.set_context("paper")
 sns.color_palette("crest", as_cmap=True)
