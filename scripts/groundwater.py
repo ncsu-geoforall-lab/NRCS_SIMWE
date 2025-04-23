@@ -8,8 +8,12 @@ from PIL import Image
 
 
 def simwe_to_strds(
-    search_pattern, strds_output, title, description, output_step=10
-):  # noqa: E501
+    search_pattern: str,
+    strds_output: str,
+    title: str,
+    description: str,
+    output_step: int = 10,
+) -> str:  # noqa: E501
     """Create a strds data set from simwe output maps"""
     # Register the output maps into a space time dataset
     gs.run_command(
@@ -42,9 +46,11 @@ def simwe_to_strds(
     return strds_output
 
 
-def ground_water_seepage(flow_accum, output_streams, threshold=150):
+def ground_water_seepage(
+    flow_accum: str, output_streams: str, threshold: int = 150
+):  # noqa: E501
     """
-    Adding baseflow to streams,
+    Adds baseflow to streams,
     needs to be run until it reaches steady state
     """
     gs.mapcalc(
@@ -55,20 +61,23 @@ def ground_water_seepage(flow_accum, output_streams, threshold=150):
 
 
 def ground_water_springs(
-    flow_accum,
-    springs,
-    springs2,
-    threshold1=150,
-    threshold2=250,
-    threshold3=300,  # noqa: E501
+    flow_accum: str,
+    springs: str,
+    springs2: str,
+    threshold1: int = 150,
+    threshold2: int = 250,
+    threshold3: int = 300,
 ):
     """compute source - groundwater springs at first order streams, no rain"""
     gs.mapcalc(
-        f"{springs} = if({flow_accum} > {threshold1} && {flow_accum} < {threshold2}, 10, 0)",  # noqa: E501
+        f"{springs} = if("
+        f"{flow_accum} > {threshold1} && {flow_accum} < {threshold2}, "
+        "10, 0)",
         overwrite=True,
     )
     gs.mapcalc(
-        f"{springs2} = if({flow_accum} > {threshold2} && {flow_accum} < {threshold3}, 10, 0)",  # noqa: E501
+        f"{springs2} = if(({flow_accum} > {threshold2}) & ({flow_accum} "
+        f"< {threshold3}), 10, 0)",
         overwrite=True,
     )
 
