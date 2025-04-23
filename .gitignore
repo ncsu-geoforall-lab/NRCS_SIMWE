@@ -167,3 +167,11 @@ grassdata/
 docs/
 
 *.bib
+
+# Ignore VTK files
+*.vtk
+
+# Ignore Video files
+*.mp4
+*.avi
+*.mov
