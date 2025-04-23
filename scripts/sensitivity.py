@@ -16,7 +16,10 @@ OUTPUT_DIR = "output"
 
 # Sensitivity Analysis Parameters
 SPATIAL_RESOLUTIONS = [1, 3, 10, 30]  # meters
-PARTICLE_DENSITY_SCALARS = [0.25, 0.5, 1, 2]  # cells x scalar = particles
+PARTICLE_DENSITY_SCALARS = [1, 10, 100]  # cells x scalar = particles
+
+# Look at time to concentration module
+# How much time
 
 SITE_PARAMS = [
     {"site": "clay-center", "crs": "32614", "res": "3", "naip": 2021},

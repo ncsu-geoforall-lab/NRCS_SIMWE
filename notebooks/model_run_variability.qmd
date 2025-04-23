@@ -1,5 +1,17 @@
-
-# Exploring the spatial patterns of Gaussian Path Sampling
+---
+title: Exploring the spatial patterns of Gaussian Path Sampling
+jupyter: python3
+execute:
+  eval: false
+  freeze: auto
+date-modified: today
+format:
+  html:
+    toc: true
+    code-tools: true
+    code-copy: true
+    code-fold: false
+---
 
 File labeling structure
 
@@ -8,6 +20,8 @@ File labeling structure
 ## Mean Value
 
 The mean value shows the smoothed result of taking the mean output from 10 model runs. This in practice multiplies the number of particles used by 10 times.
+
+### Mean Depth
 
 ::: {.grid}
 
@@ -39,6 +53,39 @@ The mean value shows the smoothed result of taking the mean output from 10 model
 :::
 
 ![](output/clay-center_depth_1_1_s_prob.webp)
+
+### Mean Discharge
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_05_average.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_10_average.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_15_average.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_25_average.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_30_average.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_disch_1_1_s_average.gif)
 
 ## Median Value
 
@@ -77,6 +124,8 @@ The median smoothed results of taking the median output from 10 model runs. This
 
 ## Maximum Value
 
+### Max Depth
+
 ::: {.grid}
 
 ::: {.g-col-6}
@@ -107,6 +156,44 @@ The median smoothed results of taking the median output from 10 model runs. This
 :::
 
 ![](output/clay-center_depth_1_1_s_maximum.gif)
+
+### Max Discharge
+
+::: {.grid}
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_05_maximum.png)
+*Output Step 5 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_10_maximum.png)
+*Output Step 10 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_15_maximum.png)
+*Output Step 15 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_20_maximum.png)
+*Output Step 20 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_25_maximum.png)
+*Output Step 25 min*
+:::
+
+::: {.g-col-6}
+![Clay-Center](output/clay-center_disch_1_1_s_30_maximum.png)
+*Output Step 30 min*
+:::
+
+:::
+
+![](output/clay-center_disch_1_1_s_maximum.gif)
 
 ## Minimum
 
