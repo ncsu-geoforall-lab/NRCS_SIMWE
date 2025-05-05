@@ -1,0 +1,104 @@
+[flake8]
+ignore =
+    # whitespace before ':' (Black)
+    E203,
+    # line break before binary operator (Black)
+    W503,
+    # block comment should start with '# '
+    E265,
+    # too many leading '#' for block comment
+    E266,
+    # module level import not at top of file
+    E402,
+    # line too long (161 > 150 characters)
+    E501,
+    # comparison to False should be 'if cond is False:' or 'if not cond:'
+    E712,
+    # do not use bare 'except'
+    E722,
+    # ambiguous variable name 'l'
+    E741,
+    # 'grass.script.core.gisenv' imported but unused
+    F401,
+    # import 'ant' from line 15 shadowed by loop variable
+    F402,
+    # 'from ... import *' used; unable to detect undefined names
+    F403,
+    # '_' may be undefined, or defined from star imports: datetime
+    F405,
+    # '...' % ... has 5 placeholder(s) but 7 substitution(s)
+    F507,
+    # '...' % ... has unsupported format character '='
+    F509,
+    # '...'.format(...) has invalid format string: Single '}' encountered in format string
+    F521,
+    # '...'.format(...) has unused named argument(s): overwrite
+    F522,
+    # '...'.format(...) has unused arguments at position(s): 0
+    F523,
+    # use ==/!= to compare constant literals (str, bytes, int, float, tuple)
+    F632,
+    # redefinition of unused 'GMessage' from line 35
+    F811,
+    # undefined name '_'
+    F821,
+    # global unused (TODO: Solve and remove exclusion)
+    F824,
+    # local variable 'center' is assigned to but never used
+    F841,
+
+# W605 invalid escape sequence
+# F823 local variable '_' defined as a builtin referenced before assignment
+per-file-ignores =
+    src/display/d.frame/d.frame.py: E302
+    src/gui/wxpython/wx.wms/wmsmenu.py: W293
+    src/gui/wxpython/wx.wms/WMSMapDisplay.py: W29
+    src/gui/wxpython/wx.wms/parse.py: E101, W191
+    src/raster/r.landscape.evol.old/r.landscape.evol.old.py: E302
+    src/raster/r.object.spatialautocor/r.object.spatialautocor.py: E302
+    src/raster/r.roughness.vector/r.roughness.vector.py: E302
+    src/raster/r.recode.attr/r.recode.attr.py: E302
+    src/raster/r.centroids/testsuite/test_r_centroids.py: E302
+    src/raster/r.euro.ecosystem/r.euro.ecosystem.py: W293
+    src/raster/r.soillossbare/r.soillossbare.py: E101, W191
+    src/raster/r.basin/r.basin.py: E302
+    src/raster/r.denoise/r.denoise.py: E302
+    src/imagery/i.landsat8.swlst/csv_to_dictionary.py: E302
+    src/imagery/i.nightlights.intercalibration/i.nightlights.intercalibration.py: E302
+    src/imagery/i.nightlights.intercalibration/test_intercalibration_models.py: E302
+    src/imagery/i.landsat/i.landsat.download/i.landsat.download.py: E302
+    src/hadoop/hd/dependency.py: E211
+    src/raster/r.category.trim/r.category.trim.py: W605
+    src/raster/r.area.createweight/r.area.createweight.py: W605
+    src/raster/r.estimap.recreation/*/*.py: W605
+    src/raster/r.green/*/*.py: W605
+    src/raster/r.futures/r.futures.demand/r.futures.demand.py: W605
+    src/imagery/i.modis/libmodis/rmodislib.py: W605
+    src/imagery/i.landsat8.swlst/*.py: W605
+    src/hadoop/hd/*/*.py: W605
+    src/misc/m.printws/m.printws.py: W605
+    src/vector/v.class.mlpy/v.class.mlpy.py: W605
+    src/temporal/t.rast.boxplot/t.rast.boxplot.py: F823
+    src/raster/r.series.boxplot/r.series.boxplot.py: F823
+
+
+max-line-length = 88
+exclude =
+    .git,
+    __pycache__,
+    .env,
+    .venv,
+    env,
+    venv,
+    ENV,
+    env.bak,
+    venv.bak,
+    # Build directories
+    bin.*,
+    dist.*,
+    OBJ.*,
+    # Test output directory
+    testreport,
+
+builtins =
+    _

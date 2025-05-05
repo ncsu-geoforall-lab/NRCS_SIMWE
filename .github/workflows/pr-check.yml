@@ -1,0 +1,55 @@
+---
+name: Quarto PR Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install jupyter
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.3'
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages:
+            any::rmarkdown
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Render Quarto Project
+        uses: quarto-dev/quarto-actions/render@v2
+
+      - name: Check if rendering succeeded
+        run: |
+          # Ensure the site folder is created
+          if [ ! -d "docs" ]; then
+            echo "Rendering failed: docs folder does not exist."
+            exit 1
+          fi
+
+      - name: Upload static files as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-site
+          path: docs/
