@@ -1,0 +1,15 @@
+---
+title: Notebooks
+subtitle: GRASS Jupyter Notebooks
+author: Corey T. White
+date: 05/05/2025
+date-modified: 05/05/2025
+listing:
+    type: grid
+    contents:
+     - "agu2024.qmd"
+     - "agu2024_combinded.ipython"
+     - "model_run_variability.qmd"
+     - "sensitivity_analysis.qmd"
+     - "workshop.ipynb"
+---

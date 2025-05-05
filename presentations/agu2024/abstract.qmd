@@ -1,0 +1,52 @@
+---
+title: Abstract
+subtitle: Sensitivity Analysis of Spatial Scale and Particle Density on Overland Flow Pattern Accuracy and Computational Demand
+date: April 16, 2025
+date-modified: 05/05/2025
+# doi: 10.5281/ZENODO.15237651 # Create DOI
+author:
+  - name: "Corey T. White"
+    degrees: PhD
+    url: "https://cwhite911.github.io/"
+    orcid: "0000-0002-2903-9924"
+    email: "ctwhite@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: op
+  - name: "Caitlin Haedrich"
+    url: "https://chaedri.github.io/"
+    orcid: "0000-0003-4373-5691"
+    email: "chaedri@ncsu.edu"
+    affiliations:
+      - ref: cga
+  - name: "Helena Mitasova"
+    degrees: PhD
+    url: "https://meas.sciences.ncsu.edu/people/hmitaso/"
+    orcid: "0000-0002-6906-3398"
+    email: "hmitaso@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: meas
+acknowledgements: |
+    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+affiliations:
+  - id: cga
+    name: Center for Geospatial Analytics at NC State University
+    url: "https://cnr.ncsu.edu/geospatial/"
+  - id: op
+    name: OpenPlains Inc.
+    url: "https://openplains.com"
+  - id: meas
+    name: Marine, Earth and Atmospheric Sciences
+    url: "https://meas.sciences.ncsu.edu/"
+---
+
+## Abstract
+
+Robust process-based overland flow modeling methods are needed to understand the impact of the spatial patterns of water flow velocity and depth. However, the computational demands required for accurately modeling overland flow can be restrictive regarding how simulations are used in practice (e.g., research/policy development, emergency management). The accuracy of overland flow simulations using path sampling methods depends on particle density to produce smooth and consistent results. The computational area’s spatial scale (i.e., extent and resolution) influences the particle density required to produce accurate water flow patterns. Our research investigates the sensitivity of simulated water flow patterns and associated computational demands to spatial scale and particle density. Simulations were performed using the spatially distributed processes-based overland flow model SIMulation of Water Erosion Model (SIMWE) implemented within GRASS GIS. SIMWE uses Green’s function to solve the St. Venant system of equations via a Monte Carlo path sampling method. This method is advantageous because water flows according to the shallow water bivariate continuity equation, incorporating drift and diffusion, which allows the elevation model to remain unmodified (e.g., no sink and fill processing). In addition to varying the particle density and spatial scale, we repeated this analysis on several different terrain types, ranging from low-relief terrain to steep mountainous hillslopes, because terrain slope and complexity also impact the sensitivity of the model to particle density. The results of this work will help future users of the SIMWE model optimize tradeoffs between accuracy and computational demand by identifying the appropriate particle density for the spatial scale of a given study area.
+
+## Session
+
+**H005 - Advancements in Process-based Hydrologic Modeling to Support Water Resources Management**
+
+Process-based hydrologic modeling has been a cornerstone of water resources management since entering the scientific computing era. Recent advancements in high-performance computing, coupled with the increasing availability of high-resolution observational data, have unveiled exciting opportunities to reimagine the capabilities of process-based hydrologic modeling. This session focuses on the development of advanced modeling capabilities and applications that integrate a broad spectrum of hydrological processes within diverse ecosystems. We encourage submissions that explore processes often neglected or over-simplified in conventional hydrologic models, such as snow dynamics, plant functions, hillslope erosion, fluvial geomorphology, groundwater-surface water interactions, the influence of human activities, and others. Additionally, we welcome presentations on the integration of those processes through the development of fully-integrated,  physically-based models. By addressing these critical aspects, the session aims to further our understanding of the complex dynamics that govern hydrological systems and contribute to more effective water resource management strategies.

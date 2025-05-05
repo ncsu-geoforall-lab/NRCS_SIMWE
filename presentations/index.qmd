@@ -1,0 +1,12 @@
+---
+title: Presentations
+subtitle: Conference Presentations
+author: Corey T. White
+date: 05/05/2025
+date-modified: 05/05/2025
+listing:
+    type: grid
+    contents:
+     - "./agu2024/agu_2024.qmd"
+     - "iale2025"
+---

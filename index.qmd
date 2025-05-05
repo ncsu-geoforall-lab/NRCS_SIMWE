@@ -7,16 +7,16 @@ about:
     - icon: github
       text: Github
       href: https://github.com/ncsu-geoforall-lab/NRCS_SIMWE/
-listing:
-    type: grid
-    contents:
-        - notebooks
-        - presentations
-        - scripts\*.qmd
-        - output\**\*.qmd
+# listing:
+#     type: grid
+#     contents:
+        # - notebooks
+        # - presentations
+        # - scripts\*.qmd
+        # - output\**\*.qmd
         # - content/workshops
-    sort: "date desc"
-    categories: true
+    # sort: "date desc"
+    # categories: true
 page-layout: full
 title-block-banner: false
 ---

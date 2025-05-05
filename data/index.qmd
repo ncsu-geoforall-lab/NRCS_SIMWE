@@ -1,0 +1,49 @@
+---
+title: Data
+author: Corey T. White
+date: 05/05/2025
+date-modified: 05/05/2025
+format: html
+---
+
+## Getting Started
+
+### Download and install GRASS
+
+### Create Python Virtual Environment
+
+```bash
+python3 -m venv .venv
+```
+
+### Activate Python Virtual Environment
+
+```bash
+source .venv/bin/activate
+```
+
+### Install Python Dependencies
+
+```bash
+pip install -r requirements.txt
+
+```
+
+### Setup GRASS Projects
+
+Now create a new GRASS project for each of the study areas. The meta data for each site is located at
+[site-CRS-info.txt](../site-CRS-info.txt).
+
+```plain
+# file: site-CRS-info.txt
+clay-center:32614:3:2021
+coweeta:26917:10:2022
+SFREC:26910:1:2022
+SJER:26911:1:2022
+tx069-playas:32613:8:2022
+```
+
+
+```bash
+$ python python3 scripts/download_data.py
+```

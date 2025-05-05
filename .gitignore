@@ -175,3 +175,6 @@ docs/
 *.mp4
 *.avi
 *.mov
+
+# Ruff
+.ruff_cache/
