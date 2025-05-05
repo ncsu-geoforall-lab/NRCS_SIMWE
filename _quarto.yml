@@ -1,3 +1,4 @@
+---
 project:
   type: website
   output-dir: docs
@@ -11,6 +12,18 @@ website:
         href: index.qmd
       - text: "Reports"
         href: output/project_reports.qmd
+      - text: "Notebooks"
+        href: notebooks/index.qmd
+      - text: "Presentations"
+        href: presentations/index.qmd
+      - text: "Publications"
+        href: publications/index.qmd
+      - text: "Data"
+        href: data/index.qmd
+      - text: "Scripts"
+        href: scripts/index.qmd
+      - text: "Tools"
+        href: tools/index.qmd
     tools:
       - icon: github
         menu:

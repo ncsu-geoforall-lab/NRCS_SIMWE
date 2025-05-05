@@ -109,7 +109,7 @@ def download_naip(year=2022):
         resolution_value=1,
         extent="region",
         nprocs=10,
-        memory=36000,
+        memory=10000,
     )
 
 
@@ -148,9 +148,7 @@ if __name__ == "__main__":
 
     # Ask GRASS GIS where its Python packages are.
     sys.path.append(
-        subprocess.check_output(
-            ["grass", "--config", "python_path"], text=True
-        ).strip()  # noqa: E501
+        subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()  # noqa: E501
     )
 
     import grass.script as gs

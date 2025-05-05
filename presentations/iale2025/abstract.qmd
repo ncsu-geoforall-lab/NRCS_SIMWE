@@ -1,0 +1,60 @@
+---
+title: Abstract
+subtitle: Topographic Impacts of Hurricane Helene in Western North Carolina
+date: April 16, 2025
+date-modified: 05/05/2025
+image: images/img0.png
+doi: 10.5281/ZENODO.15237651
+author:
+  - name: "Corey T. White"
+    degrees: PhD
+    url: "https://cwhite911.github.io/"
+    orcid: "0000-0002-2903-9924"
+    email: "ctwhite@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: op
+  - name: "Pratikshya Regmi"
+    url: "https://www.researchgate.net/profile/Pratikshya-Regmi"
+    affiliations:
+      - ref: cga
+  - name: "William Reckling"
+    orcid: "0000-0003-0426-6693"
+    affiliations:
+      - ref: cga
+      - ref: erdc
+  - name: "Helena Mitasova"
+    degrees: PhD
+    url: "https://meas.sciences.ncsu.edu/people/hmitaso/"
+    orcid: "0000-0002-6906-3398"
+    email: "hmitaso@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: meas
+acknowledgements: |
+    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+affiliations:
+  - id: cga
+    name: Center for Geospatial Analytics at NC State University
+    url: "https://cnr.ncsu.edu/geospatial/"
+  - id: op
+    name: OpenPlains Inc.
+    url: "https://openplains.com"
+  - id: meas
+    name: Marine, Earth and Atmospheric Sciences
+    url: "https://meas.sciences.ncsu.edu/"
+  - id: erdc
+    name: U.S. Amry Corps of Engineers, Engineer Research and Development Center (ERDC)
+---
+
+## Abstract
+
+Hurricane Helene caused record flooding, resulting in significant topographic disturbances across Western North Carolina. While aerial imagery is critical in immediate relief efforts, 3D topographic products provide emergency managers with actionable insights by identifying the location, extent, and volume of damages, sediment, and other flood debris requiring prioritized resource allocation. However, generating post-storm digital elevation models (DEMs) poses challenges. Heavy cloud cover limited the use of satellite imagery, while LiDAR—despite its high accuracy—is challenging to deploy rapidly in post-storm scenarios. To overcome these limitations, post-storm aerial imagery collected by the Civil Air Patrol (CAP) provided crucial early data for understanding the full range of topographic disturbances. We employed structure-from-motion (SfM) to process 69,247 CAP aerial images (~1.41 TB) into digital surface models (DSM). Data fusion was applied to generate post-storm digital terrain models (DTM) by fusing post-storm SfM-based DSM with pre-storm LiDAR-based DTM. The resulting post-storm DEMs were compared to 2018 LiDAR-based DEMs to estimate spatially explicit topographic changes across an area of ~54,000 km². This process revealed several key challenges for rapid post-storm DEM generation, including collecting, storing, and processing large volumes of raw image data. Addressing these challenges is critical for improving workflows and enabling faster deployment of topographic data products for disaster response and recovery.
+
+## Symposium
+
+**10. Remote Sensing of Landscape Change and Disturbance (Open)**
+
+Remote sensing has been a foundational tool for landscape ecology for decades, and it has been critical for tracking disturbance and change over time. From providing national products and datasets, to monitoring landscape dynamics in near-real-time, to the integration with other datasets, remote sensing has carved out a pivotal role. Development of new platforms and sensors having increasing spatial, temporal and spectral resolution and  new sensor modalities offers unprecedented opportunities to better understand the locations, severity and rates of disturbance and change that are increasingly reshaping landscapes in both predictable and novel ways. Emerging machine learning and big data analytics algorithms, computational methods and improved access to high performance and cloud computing resources have enabled novel use and application of voluminous remote sensing datasets. Technical and methodological advances have led to a substantial increase in data availability, to the extent that the sheer abundance of data products can create a challenge. While routine adoption of tools, approaches and technologies continues to lag cutting edge research, this application divide itself presents opportunities for further research and collaboration. This open IALE-NA symposium invites all practitioners to share their approaches and experiences using remote sensing methods to understand, detect, describe and monitor landscape change and disturbances through time.
+
+Southern states, including the host state of North Carolina, have experienced a number of devastating disturbance events this year that have impacted human and ecological systems alike. We particularly invite presentations that study those disturbance events.

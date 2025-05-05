@@ -1,0 +1,18 @@
+---
+title: Scripts
+subtitle: Scripts used to generate experimental results.
+author: Corey T. White
+date: 05/05/2025
+date-modified: 05/05/2025
+---
+
+* [download_data.py](download_data.py) - script automates the process of downloading, importing, and processing geospatial data using GRASS. It imports elevation data, soil survey data, and NAIP imagery, setting up a GRASS environment for further geospatial analysis.
+* [create_figures.py](create_figures.py) - This script creates figuers
+* [create_locations.py](create_locations.py) - Creates locations
+
+* [geomorphology.py](geomorphology.py) - Generates 1st and 2nd order geomophometric derivitives.
+* [groundwater.py](groundwater.py) - Examples of how to seed r.sim.water streams.
+* [gutiles.py](gutiles.py) - GRASS utility functions
+* [sensitivity.py](sensitivity.py) - Runs sensitivity analysis on all of the sites.
+* [simulation.py](simulation.py) - Runs simultion on all of the sites
+* [watershed_extent.py](watershed_extent.py) - Explores the sensitivity of r.watershed basin delinitation to spatial resolution.

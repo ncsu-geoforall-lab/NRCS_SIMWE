@@ -1,0 +1,627 @@
+---
+title: Topographic Impacts of Hurricane Helene
+subtitle: in Western North Carolina
+date: April 16, 2025
+date-modified: 05/05/2025
+image: images/img0.png
+doi: 10.5281/ZENODO.15237651
+author:
+  - name: "Corey T. White"
+    degrees: PhD
+    url: "https://cwhite911.github.io/"
+    orcid: "0000-0002-2903-9924"
+    email: "ctwhite@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: op
+  - name: "Pratikshya Regmi"
+    url: "https://www.researchgate.net/profile/Pratikshya-Regmi"
+    affiliations:
+      - ref: cga
+  - name: "William Reckling"
+    orcid: "0000-0003-0426-6693"
+    affiliations:
+      - ref: cga
+      - ref: erdc
+  - name: "Helena Mitasova"
+    degrees: PhD
+    url: "https://meas.sciences.ncsu.edu/people/hmitaso/"
+    orcid: "0000-0002-6906-3398"
+    email: "hmitaso@ncsu.edu"
+    affiliations:
+      - ref: cga
+      - ref: meas
+acknowledgements: |
+    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+affiliations:
+  - id: cga
+    name: Center for Geospatial Analytics at NC State University
+    url: "https://cnr.ncsu.edu/geospatial/"
+  - id: op
+    name: OpenPlains Inc.
+    url: "https://openplains.com"
+  - id: meas
+    name: Marine, Earth and Atmospheric Sciences
+    url: "https://meas.sciences.ncsu.edu/"
+  - id: erdc
+    name: U.S. Amry Corps of Engineers, Engineer Research and Development Center (ERDC)
+format:
+  revealjs:
+    slide-number: c/t
+    width: 1600
+    height: 900
+    # logo:
+    title-slide-attributes:
+      data-background-image:  images/img0.png
+      # data-background-size: fill
+    # footer: "Organization"
+    incremental: true
+    theme: [../../grass.scss]
+draft: true
+---
+
+# Sponsors
+
+<div class="columns-3">
+  <img src="images/IALE_2025_0.png" alt="Image 0" style="width: 100%;">
+  <img src="images/IALE_2025_1.png" alt="Image 1" style="width: 100%;">
+  <img src="images/IALE_2025_2.png" alt="Image 2" style="width: 100%;">
+  <img src="images/IALE_2025_3.png" alt="Image 3" style="width: 100%;">
+  <img src="images/IALE_2025_4.png" alt="Image 4" style="width: 100%;">
+  <img src="images/IALE_2025_5.png" alt="Image 5" style="width: 100%;">
+</div>
+
+# Hurricane Helene
+
+__Sept 24 \- 27\, 2024__
+
+__Makes landfall off the Florida Coast__
+
+__Category__  __ 4__
+
+__Massive inland flooding__
+
+__ 34 flash flood emergencies__
+
+__~250 Fatalities__
+
+__$78\.8 billion dollars of__
+
+__estimated damage__
+
+![](images/IALE_2025_6.png)
+
+__Hagen et al\. 2025__
+
+# Imagery
+
+![](images/IALE_2025_7.png)
+
+<span style="color:#6aa84f">https://storms\.ngs\.noaa\.gov/storms/helene/index\.html\#15\.42/35\.568578/\-82\.540574</span>
+
+![](images/IALE_2025_8.png)
+
+
+
+* __Civil__  __ Air Patrol Flights__
+* __Takes __  __aerial__  __ __  __imagery__  __ after natural disasters__
+* __Satellite__  __ __
+* __Cloud cover or smoke can prevent clear imaging of impacted areas__
+* __UAS__
+* __Good for capturing smaller areas__
+* __Hard to capture areas that are __  __unacceptable__
+  * __Destroy road__
+  * __Debris__
+
+
+![](images/IALE_2025_9.png)
+
+__Flight Vector Data: __  _[https://services\.arcgis\.com/XG15cJAlne2vxtgt/ArcGIS/rest/services/Image\_Points\_view/FeatureServer/3/query](https://services.arcgis.com/XG15cJAlne2vxtgt/ArcGIS/rest/services/Image_Points_view/FeatureServer/3/query)_
+
+::: {.notes}
+
+post-storm aerial imagery collected by the Civil Air Patrol (CAP) provided crucial early data for understanding the full range of topographic disturbances. We employed structure-from-motion (SfM) to process 69,247 CAP aerial images (~1.41 TB) into digital surface models (DSM)
+
+:::
+
+# Topographic Products
+
+
+
+* <span style="color:#0e101a"> __Provide emergency managers with actionable insights by identifying__ </span>
+* <span style="color:#0e101a">Location</span>
+* <span style="color:#0e101a">Extent</span>
+* <span style="color:#0e101a">Volume</span>
+* <span style="color:#0e101a"> __To help estimate and p__ </span>  <span style="color:#0e101a"> __rioritized resources to address__ </span>
+* <span style="color:#0e101a">Structural Damages</span>
+  * <span style="color:#0e101a">Buildings</span>
+  * <span style="color:#0e101a">Bridges</span>
+  * <span style="color:#0e101a">Roads</span>
+* <span style="color:#0e101a">Erosion and Deposition</span>
+* <span style="color:#0e101a">Landslides</span>
+
+
+![](images/IALE_2025_10.png)
+
+# Challenges
+
+![](images/IALE_2025_11.jpg)
+
+![](images/IALE_2025_12.jpg)
+
+<span style="color:#38761d"> _What about LiDAR?_ </span>
+
+__LiDAR is expensive and hard to coordinate and process rapidly__
+
+<span style="color:#38761d"> _Photogrammetry and SfM_ </span>
+
+__Lots of data to process quickly__
+
+__No Ground Control Points__
+
+__Large Forested Areas__
+
+__F__  __lights flown for imagery collection__
+
+![](images/IALE_2025_13.jpg)
+
+![](images/IALE_2025_14.jpg)
+
+![](images/IALE_2025_15.jpg)
+
+![](images/IALE_2025_16.jpg)
+
+![](images/IALE_2025_17.jpg)
+
+![](images/IALE_2025_18.jpg)
+
+![](images/IALE_2025_19.png)
+
+![](images/IALE_2025_20.png)
+
+# UAS Mapping and
+Analysis
+
+
+
+* __With __  __Guidance__  __ from U\.S\. Army Corps of Engineers \(Dr\. Reckling\)__
+* __8 student projects\!\!\!__
+* __> 1000 Images__
+* __> 50 km__  __2__
+  * Spruce Pine\, NC
+  * Blowing Rock\, NC \(Sorrento Skies/Ski Mountain/Downtown Area\)
+  * Roan Mountain\, TN
+  * US421N just East of Vilas\, NC
+  * Sandy Mush\, NC
+  * Hendersonville\-E Flat Rock
+  * Bearwallow\-Chimney Rock
+
+
+![](images/IALE_2025_21.png)
+
+![](images/IALE_2025_22.jpg)
+
+![](images/IALE_2025_23.png)
+
+__Student Created Digital Elevation Models \(DEM\)__
+
+# https://ncsu-geoforall-lab.github.io/gis-584-uas-course/
+
+# Our Approach
+
+<span style="color:#ffffff">Photogrammetry & SfM</span>
+
+
+
+* Collect Raw Flight Image Data
+* CAP Civil Air Patrol
+  * U\.S\. Air Force Auxiliary aids FEMA in disaster\-response efforts\.
+* ArcGIS REST API
+* ESRI ImageServer
+
+
+Convert images into dense point cloud\, orthomosaic\, and mesh\.
+
+WebODM
+
+AgiSoft Metashape
+
+Post\-processing with  <span style="color:#38761d">GRASS</span>
+
+Interpolate point cloud data into DSM\.
+
+Correct vertical shifts
+
+Volumetric change estimations
+
+Develop finalized data products
+
+![](images/IALE_2025_24.png)
+
+
+
+* __Civil Air Patrol Flights__
+* __Project: CAP\-H\-TS Helene 2024__
+* __Mission: 24\-1\-5849__
+* __35 Flights__
+* __Flown between__
+  * __Sept 27 \- Oct 8__
+* __Data__
+* _69\,247 RGB JPEG Images \(~1\.41 TB\)_
+* _Image Resolution: 8688 x 5792_
+* _Focal Length: 50mm_
+* _Pixel Size: 4\.24 x 4\.24 μm_
+* __Spatial__
+* __WGS84 \(EPSG::4326\)__
+* __Yaw\, Pitch\, Role__
+
+
+![](images/IALE_2025_25.png)
+
+__Flight Vector Data: __  _[https://services\.arcgis\.com/XG15cJAlne2vxtgt/ArcGIS/rest/services/Image\_Points\_view/FeatureServer/3/query](https://services.arcgis.com/XG15cJAlne2vxtgt/ArcGIS/rest/services/Image_Points_view/FeatureServer/3/query)_
+
+::: {.notes}
+
+post-storm aerial imagery collected by the Civil Air Patrol (CAP) provided crucial early data for understanding the full range of topographic disturbances. We employed structure-from-motion (SfM) to process 69,247 CAP aerial images (~1.41 TB) into digital surface models (DSM)
+
+:::
+
+# Photogrammetry & SfM (Structure from Motion)
+
+__Align__  __ Photos__
+
+__Develop Depth Maps__
+
+__Dense Point Clouds__
+
+__Digital Elevation Model \(DEM\)__
+
+__Mesh__
+
+![](images/IALE_2025_26.png)
+
+![](images/IALE_2025_27.png)
+
+__Swannanoa River __
+
+__Valley__
+
+__Bearwallow\-Chimney Rock__
+
+![](images/IALE_2025_28.jpg)
+
+![](images/IALE_2025_29.jpg)
+
+__Data Reprojected to NAD83\(HARN\) / North Carolina \(EPSG:3358\)__
+
+# Swannanoa NC - CAP Flight A006B
+
+__Number of images:__ 1\,515
+
+__Camera stations:__  1\,504
+
+__Flying altitude: __ 960 m
+
+__Tie points: __ 2\,064\,970
+
+__Ground resolution: __ 7\.98 cm/pix
+
+__Projections:__  5\,164\,112
+
+__Coverage area: __ 80\.6 km²
+
+__Reprojection error:__  2\.08 pix
+
+![](images/IALE_2025_30.png)
+
+__Camera Locations and Error Estimates__
+
+# Camera Calibration
+
+![](images/IALE_2025_31.png)
+
+![](images/IALE_2025_32.png)
+
+__Image residuals for Canon EOS 5DS R\, EF50mm f/1\.4 USM \(50mm\)\.__
+
+__Camera Locations and Image Overlap__
+
+![](images/IALE_2025_33.png)
+
+# Systematic Vertical Shift
+
+<span style="color:#93c47d"> __Pre\-Correction Vertical Error__ </span>
+
+__MSE:__  56\.89 m
+
+__RMSE:__  7\.54 m
+
+__RMdSE \(Median\):__  5\.25 m
+
+<span style="color:#93c47d"> __Post\-Vertical __ </span>  <span style="color:#93c47d"> __Alignment__ </span>
+
+__RMSE:__  0\.39 m \(~1\.28 US Survey feet\)
+
+<span style="color:#93c47d"> __LiDAR to __ </span>  <span style="color:#93c47d"> __Geodetic__ </span>  <span style="color:#93c47d"> __ __ </span>  <span style="color:#93c47d"> __Control__ </span>  <span style="color:#93c47d"> __ Point v\. DTM__ </span>  <span style="color:#93c47d"> </span>
+
+__RMSE:__  0\.121 m
+
+![](images/IALE_2025_34.png)
+
+# Topographic Derivatives
+
+<span style="color:#274e13"> _DSM \(Digital Surface Model\)_ </span>
+
+![](images/IALE_2025_35.png)
+
+![](images/IALE_2025_36.png)
+
+![](images/IALE_2025_37.png)
+
+__minimum: __  __627\.142__
+
+__maximum: __  __1205\.31__
+
+__range: __  __578\.165__
+
+__mean: __  __774\.047__
+
+__mean of absolute values: __  __774\.047__
+
+__standard deviation: __  __92\.2234__
+
+__median : __  __746\.752__
+
+__minimum__  __: 2\.20804e\-05__
+
+__maximum__  __: 360__
+
+__range__  __: 360__
+
+__mean__  __: 180\.977__
+
+__mean of absolute values__  __: 180\.977__
+
+__standard deviation__  __: 102\.844__
+
+__median__  __: 181\.068__
+
+__minimum: __  __0\.000618198__
+
+__maximum: __  __88\.5532__
+
+__range: __  __88\.5526__
+
+__mean: __  __35\.3713__
+
+__mean of absolute values: __  __35\.3713__
+
+__standard deviation: __  __23\.0795__
+
+__median: __  __34\.8844__
+
+# Topographic Change
+
+![](images/IALE_2025_38.png)
+
+__minimum__  __: \-2__
+
+__maximum__  __: 2__
+
+__range__  __: 4__
+
+__mean__  __: 0\.21599__
+
+__mean of absolute values__  __: 0\.5558__
+
+__standard deviation:__  __ 0\.694954__
+
+__median:__  __ 0\.150562__
+
+![](images/IALE_2025_39.png)
+
+![](images/IALE_2025_40.png)
+
+![](images/IALE_2025_41.png)
+
+# Swannanoa, NC
+Record Gauge Height
+27.33 ft
+
+__October 6th\, 2024__
+
+![](images/IALE_2025_42.png)
+
+![](images/IALE_2025_43.png)
+
+__October 6th\, 2024__
+
+![](images/IALE_2025_44.png)
+
+# Stream Bank Erosion
+
+![](images/IALE_2025_45.png)
+
+![](images/IALE_2025_46.png)
+
+<span style="color:#ff0000">SfM DSM \- Not Corrected</span>
+
+<span style="color:#783f04">NC Phase 2018 LiDAR DTM</span>
+
+<span style="color:#00ff00">Corrected SfM DSM</span>
+
+![](images/IALE_2025_47.png)
+
+# Landslides
+
+![](images/IALE_2025_48.png)
+
+Top of Landslide
+
+![](images/IALE_2025_49.png)
+
+Hidden by Canopy
+
+Bottom of Landslide
+
+# Landslides (cont.)
+
+![](images/IALE_2025_50.png)
+
+![](images/IALE_2025_51.png)
+
+![](images/IALE_2025_52.png)
+
+# Landslides (cont.)
+
+![](images/IALE_2025_53.png)
+
+__Number of Clumps:__  __ 3__
+
+| __Clump__ | __Volume \(m__  __3__  __\)__ | __Average \(Difference\)__ | __Area __  __\(m__  __2__  __\)__ |
+| :-: | :-: | :-: | :-: |
+| 1 | 694\.01 | 0\.51 | 1355 |
+| 2 | 1422\.83 | 0\.59 | 2409 |
+| 3 | 5757\.43 | 0\.40 | 14771 |
+| __Total__ | __7874\.27__ |  | __18535__ |
+
+__Estimate Debris Removal Cost__
+
+~788 Loads \(10m3 __ per load__ \)
+
+$78K \- $158k Removal Cost
+
+![](images/IALE_2025_54.png)
+
+<span style="color:#6aa84f">https://www\.fema\.gov/appeal/debris\-removal\-1</span>
+
+# Flow Accumulation & Streams
+
+![](images/IALE_2025_55.png)
+
+![](images/IALE_2025_56.png)
+
+::: {.notes}
+
+Computes sediment transport capacity - (Erosion Modeling in GIS book chapter)
+Water depth * slope (power function)
+
+:::
+
+# Bearwallow-Chimney Rock - CAP Flight A006B
+
+__Number of images:__ 1\,444
+
+__Camera stations:__  1\,254
+
+__Flying altitude: __ 1\.04 km
+
+__Tie points: __ 1\,893\,146
+
+__Ground resolution: __ 9\.28 cm/pix
+
+__Projections:__  4\,512\,928
+
+__Coverage area: __ 75\.2 km²
+
+__Reprojection error:__  1\.18 pix
+
+![](images/IALE_2025_57.jpg)
+
+# Steep Mountainous Terrain
+
+![](images/IALE_2025_58.png)
+
+![](images/IALE_2025_59.png)
+
+![](images/IALE_2025_60.png)
+
+# Strahler Stream Order
+
+![](images/IALE_2025_61.png)
+
+__Fluvial geomorphological changes along Brood River__
+
+![](images/IALE_2025_62.png)
+
+__New Stream Channel__
+
+__\(Blue\)__
+
+__2017 NC Streams__
+
+__\(Yellow\)__
+
+# Bearwallow-Chimney Rock - CAP Flight A0069
+
+# Bearwallow-Chimney Rock
+
+![](images/IALE_2025_63.png)
+
+![](images/IALE_2025_64.png)
+
+_Fun Fact_
+
+__Filming __  __Location__
+
+![](images/IALE_2025_65.jpg)
+
+__Debris __  __Damming__  __ River__
+
+# Debris Volume
+
+![](images/IALE_2025_66.png)
+
+Estimated at
+
+__~28\.3 million Cubic__
+
+__Meters__
+
+__~11\,321__
+
+__Olympic Swimming __
+
+__Pools__
+
+# Bearwallow-Chimney Rock
+
+![](images/IALE_2025_67.png)
+
+![](images/IALE_2025_68.png)
+
+__DSM created using 2024 SfM data__
+
+![](images/IALE_2025_69.png)
+
+![](images/IALE_2025_70.png)
+
+__DSM created using 2017 LiDAR data__
+
+# Lessons Learned
+
+<span style="color:#0e101a"> _This process revealed several key challenges for rapid post\-storm DEM generation\, _ </span>  <span style="color:#0e101a"> _including collecting\, storing\, and processing large volumes of raw image data_ </span>  <span style="color:#0e101a"> _\. Addressing these challenges is critical for improving workflows and enabling faster deployment of topographic data products for disaster response and recovery\._ </span>
+
+<span style="color:#6aa84f"> __Processing __ </span>  <span style="color:#6aa84f"> __infrastructure__ </span>
+
+<span style="color:#0e101a">HPC or Cloud Resources</span>
+
+<span style="color:#6aa84f"> __Data Publishing__ </span>
+
+<span style="color:#0e101a">DSM</span>
+
+<span style="color:#0e101a">Point Cloud</span>
+
+<span style="color:#0e101a">Mesh</span>
+
+<span style="color:#6aa84f"> __Data __ </span>  <span style="color:#6aa84f"> __Distribution__ </span>
+
+<span style="color:#0e101a">Mix of online and printed resources</span>
+
+# Questions?
+
+# References
+
+__Andrew B\. Hagen\, John P\. Cangialosi\, Marc Chenard\, Laura Alaka\, Sandy Delgado\, 2025\. Hurricane Helene \(TROPICAL CYCLONE REPORT No\. AL092024\)\. NOAA NATIONAL HURRICANE CENTER\.__
+
+<span style="color:#222222">National Geodetic Survey\, 2025: 2024 NOAA NGS Emergency Response Imagery: Hurricane Helene\, </span>  _[https://www\.fisheries\.noaa\.gov/inport/item/73570](https://www.fisheries.noaa.gov/inport/item/73570)_  <span style="color:#222222">\.</span>
