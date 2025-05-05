@@ -4,7 +4,7 @@ listing:
     type: grid
     contents:
         - ./clay-center/*.qmd
-        - ./coweeta
+        - ./coweeta/*.qmd
         - ./SFREC
         - ./SJER
         - ./tx069-playas

@@ -1,0 +1,24 @@
+---
+title: "Coweeta"
+format: html
+execute:
+  freeze: auto
+params:
+  site_name: "Coweeta"
+  author: "Corey T. White"
+  site_image: "elev.png"
+  subtitle: "Site Report"
+  date: "Monday, 1 January 2025"
+  acknowledgements: |
+    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+  naip_year: 2021
+  dem_resolution: "10m"
+  unit_of_measure: "meters"
+  epsg: "26917"
+  crs: "CRS: NAD83 / UTM zone 17N"
+---
+
+```{r}
+# Render the template with the params
+quarto::quarto_render("templates/report-template.qmd", params = params)
+```

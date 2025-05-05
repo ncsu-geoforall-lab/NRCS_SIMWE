@@ -7,16 +7,6 @@ about:
     - icon: github
       text: Github
       href: https://github.com/ncsu-geoforall-lab/NRCS_SIMWE/
-# listing:
-#     type: grid
-#     contents:
-        # - notebooks
-        # - presentations
-        # - scripts\*.qmd
-        # - output\**\*.qmd
-        # - content/workshops
-    # sort: "date desc"
-    # categories: true
 page-layout: full
 title-block-banner: false
 ---
@@ -46,7 +36,7 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 - [x] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-Report: [output/clay-center/report.md](output/clay-center/report.md)
+[Report](output/clay-center/report.qmd)
 
 :::
 
