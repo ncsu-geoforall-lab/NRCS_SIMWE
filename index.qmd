@@ -49,7 +49,7 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 - [X] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-Report: [output/coweeta/report.md](output/coweeta/report.md)
+[Report](output/coweeta/report.qmd)
 
 :::
 

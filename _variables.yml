@@ -1,0 +1,66 @@
+---
+authors:
+  - ctwhite:
+      name: "Corey T. White"
+      degrees: PhD
+      url: "https://cwhite911.github.io/"
+      orcid: "0000-0002-2903-9924"
+      email: "ctwhite@ncsu.edu"
+      affiliations:
+        - ref: cga
+        - ref: op
+  - pregmi3:
+      name: "Pratikshya Regmi"
+      url: "https://www.researchgate.net/profile/Pratikshya-Regmi"
+      orcid: "0009-0004-6271-9966"
+      email: "pregmi3@ncsu.edu"
+      affiliations:
+        - ref: cga
+  - wjreckli:
+      name: "William Reckling"
+      orcid: "0000-0003-0426-6693"
+      affiliations:
+        - ref: cga
+        - ref: erdc
+  - hmitaso:
+      name: "Helena Mitasova"
+      degrees: PhD
+      url: "https://meas.sciences.ncsu.edu/people/hmitaso/"
+      orcid: "0000-0002-6906-3398"
+      email: "hmitaso@ncsu.edu"
+      affiliations:
+        - ref: cga
+        - ref: meas
+  - chaedri:
+      name: "Caitlin Haedrich"
+      url: "https://chaedri.github.io/"
+      orcid: "0000-0003-4373-5691"
+      email: "chaedri@ncsu.edu"
+      affiliations:
+        - ref: cga
+
+affiliations:
+  - id: cga
+    name: Center for Geospatial Analytics at NC State University
+    url: "https://cnr.ncsu.edu/geospatial/"
+  - id: op
+    name: OpenPlains Inc.
+    url: "https://openplains.com"
+  - id: meas
+    name: Marine, Earth and Atmospheric Sciences
+    url: "https://meas.sciences.ncsu.edu/"
+  - id: erdc
+    name: U.S. Amry Corps of Engineers, Engineer Research and Development Center (ERDC)
+    url: "https://www.erdc.usace.army.mil/"
+
+funding:
+  - id: nsf
+    name: National Science Foundation
+    url: "https://www.nsf.gov/"
+    logo: "assets/logos/nsf_horizontal.png"
+    grant: ""
+  - id: usda-nrcs
+    name: USDA Natural Resources Conservation Service
+    url: "https://www.nrcs.usda.gov/"
+    logo: "assets/logos/usda-nrcs_horizontal_white.png"
+    grant: ""

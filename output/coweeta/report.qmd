@@ -1,24 +1,46 @@
 ---
 title: "Coweeta"
+subtitle: "Site Report"
+site_image: "elev.png"
+page-layout: full
+title-block-banner: true
+
 format: html
 execute:
   freeze: auto
-params:
-  site_name: "Coweeta"
-  author: "Corey T. White"
-  site_image: "elev.png"
-  subtitle: "Site Report"
-  date: "Monday, 1 January 2025"
-  acknowledgements: |
-    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
-  naip_year: 2021
-  dem_resolution: "10m"
-  unit_of_measure: "meters"
-  epsg: "26917"
-  crs: "CRS: NAD83 / UTM zone 17N"
+jupyter: python3
 ---
 
-```{r}
-# Render the template with the params
-quarto::quarto_render("templates/report-template.qmd", params = params)
+```{python}
+# | lable: generating-template
+# | echo: false
+# | output: false
+
+from IPython.display import display, HTML
+import subprocess
+
+# Render the Quarto template and capture the output
+result = subprocess.run(
+    [
+        "quarto",
+        "render",
+        "../../templates/report-template.qmd",
+        "--execute-params",
+        "params.yml",
+        "--output",
+        "-",
+    ],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+)
+```
+
+
+```{python}
+# | label: display-report
+# | echo: false
+
+# Display the rendered HTML output
+display(HTML(result.stdout))
 ```

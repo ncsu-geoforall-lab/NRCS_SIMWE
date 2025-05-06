@@ -1,0 +1,10 @@
+---
+project_name: "Coweeta"
+project_description: "Coweeta Hydrologic Laboratory"
+project_location: "Coweeta Hydrologic Laboratory, North Carolina"
+project_url: "https://research.fs.usda.gov/srs/forestsandranges/locations/coweeta"
+naip_year: 2021
+dem_resolution: "10m"
+unit_of_measure: "meters"
+epsg: "26917"
+crs: "CRS: NAD83 / UTM zone 17N"
