@@ -12,7 +12,41 @@
 #
 #############################################################################
 
+import sys
+from contextlib import contextmanager
+import gettext
 import grass.script as gs
+import grass.script.core as gcore
+from grass.exceptions import CalledModuleError
+
+# Set up translation function
+_ = gettext.gettext
+
+
+@contextmanager
+def add_sys_path(new_path: str):
+    """
+    Context manager to temporarily add a directory to the Python module search path (sys.path).
+
+    This function allows you to temporarily include a specified directory in the Python
+    module search path. Once the context is exited, the original sys.path is restored.
+
+    Args:
+        new_path (str): The directory path to be added to sys.path.
+
+    Yields:
+        None: This context manager does not return any value.
+
+    Example:
+        with add_sys_path('/path/to/directory'):
+        # After the context, sys.path is restored to its original state.
+    """
+    original_sys_path = sys.path[:]
+    sys.path.append(new_path)
+    try:
+        yield
+    finally:
+        sys.path = original_sys_path
 
 
 def region_to_wgs84_decimal_degrees_bbox():
@@ -23,6 +57,162 @@ def region_to_wgs84_decimal_degrees_bbox():
         for c in [region["ll_w"], region["ll_s"], region["ll_e"], region["ll_n"]]
     ]
     return bbox
+
+
+def region_to_crs_bbox(target_crs: str):
+    """Convert GRASS region bounds to a bounding box in another CRS using m.proj."""
+    region = gs.region()
+    # Extract corner coordinates
+    west, south, east, north = region["w"], region["s"], region["e"], region["n"]
+
+    # Format input coordinates for m.proj (as string input to stdin)
+    coords = f"{west} {south}\n{east} {north}\n"
+
+    proj_in = gs.parse_command("g.proj", flags="j")
+    proj_out = gs.parse_command("g.proj", flags="j", proj=target_crs)
+
+    try:
+        output = gs.read_command(
+            "m.proj",
+            input="-",
+            proj_in=proj_in,
+            proj_out=proj_out,
+            stdin=coords,
+            quiet=True,
+        )
+    except CalledModuleError as e:
+        gs.fatal(f"Projection failed: {e}")
+
+    # Parse output
+    lines = output.strip().splitlines()
+    ll_x, ll_y = map(float, lines[0].split())  # Lower-left
+    ur_x, ur_y = map(float, lines[1].split())  # Upper-right
+
+    return [ll_x, ll_y, ur_x, ur_y]
+
+
+def check_addon_installed(addon: str, fatal=True) -> None:
+    """Check if a GRASS GIS addon is installed"""
+    if not gcore.find_program(addon, "--help"):
+        call = gcore.fatal if fatal else gcore.warning
+        call(
+            _(
+                "Addon {a} is not installed. Please install it using g.extension."
+            ).format(a=addon)
+        )
+
+
+class InvalidMUKEYError(Exception):
+    def __init__(self, mukey: str, valid_mukeys: set):
+        self.mukey = mukey
+        self.valid_mukeys = valid_mukeys
+        super().__init__(
+            f"Invalid MUKEY '{mukey}'. Must be one of: {', '.join(valid_mukeys)}"
+        )
+
+
+def validate_mukey(mukey: str, valid_mukeys: set = None) -> None:
+    if valid_mukeys is None:
+        valid_mukeys = {
+            "gnatsgo",
+            "gssurgo",
+            "statsgo",
+            "hi_ssurgo",
+            "pr_ssurgo",
+            "rss",
+        }
+    if mukey.lower() not in valid_mukeys:
+        raise InvalidMUKEYError(mukey, valid_mukeys)
+
+
+def lookup_mukey_crs(mukey: str) -> str:
+    """
+    Lookup the coordinate reference system (CRS) for a given MUKEY.
+
+    Args:
+        mukey (str): The MUKEY identifier.
+
+    Returns:
+        str: The CRS string for the specified MUKEY.
+    """
+    mukey = mukey.lower()
+    if mukey == "gssurgo":
+        return "EPSG:5070"
+    elif mukey == "statsgo":
+        return "EPSG:5070"
+    elif mukey == "gnatsgo":
+        return "EPSG:5070"
+    elif mukey == "hi_ssurgo":
+        return "EPSG:6628"
+    elif mukey == "pr_ssurgo":
+        return "EPSG:32161"
+    else:
+        raise ValueError(f"Unknown MUKEY '{mukey}'")
+
+
+class MUKEY_WCS:
+    """
+    Class to handle the MUKEY WCS (Web Coverage Service) for soil data.
+
+    This class provides methods to interact with the MUKEY WCS, including
+    downloading and processing soil data.
+
+    Attributes:
+        mukey (str): The MUKEY identifier for the soil data.
+        bbox (list): The bounding box coordinates for the area of interest.
+    """
+
+    _base_url = "https://casoilresource.lawr.ucdavis.edu/cgi-bin/mapserv?"
+    _service_url = "map=/soilmap2/website/wcs/mukey.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage"
+    db = "gSSURGO"
+    crs = "EPSG:5070"
+
+    def __init__(
+        self, mukey: str, region: str = None, project: str = None, crs: str = None
+    ):
+        validate_mukey(mukey)
+        self.mukey = mukey
+        self.region = None  # Use current region if not set
+        self.project = None  # Use current project if not set
+        self.crs = None  # CRS use to request data
+
+    def get_coverage(self, output: str = None) -> str:
+        """
+        Get the coverage for the specified MUKEY and bounding box.
+
+        This method constructs the URL for the WCS request and retrieves the
+        soil data for the specified MUKEY and bounding box.
+
+        Returns:
+            str: The URL for the WCS request.
+        """
+        check_addon_installed("r.in.wcs")
+        url_params = (
+            "SERVICE=WCS&VERSION=2.0.1&"
+            + "REQUEST=GetCoverage&"
+            + "FORMAT=image/tiff&"
+            + "GEOTIFF:COMPRESSION=DEFLATE"
+        )
+
+        crs = lookup_mukey_crs(self.mukey)
+
+        try:
+            gs.run_command(
+                "r.in.wcs",
+                url=self._base_url,
+                coverage=self.mukey,
+                urlparams=url_params,
+                output=output,
+                crs=crs,
+                location=self.project,
+                region=self.region,
+                flags="r",
+                verbose=True,
+                # overwrite=True,
+                # quiet=True,
+            )
+        except CalledModuleError as e:
+            gs.fatal(_("Error running r.in.wcs: {e}").format(e=e))
 
 
 SOIL_PROPERTIES = {

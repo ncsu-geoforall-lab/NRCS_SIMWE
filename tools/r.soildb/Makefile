@@ -2,10 +2,8 @@ MODULE_TOPDIR =../..
 
 PGM = r.soildb
 
-SUBDIRS = libstac \
-        v.in.sda.soils \
-        v.in.ssurgo \
-        r.in.soilgrids \
+SUBDIRS = libsoil \
+          r.in.ssurgo
 
 include $(MODULE_TOPDIR)/include/Make/Dir.make
 
