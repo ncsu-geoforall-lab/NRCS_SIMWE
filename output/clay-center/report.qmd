@@ -2,7 +2,8 @@
 title: Clay Center
 jupyter: python3
 format: html
-author: "Corey T. White"
+author: Corey T. White
+date: May 8, 2025
 execute:
     freeze: auto
 
@@ -10,8 +11,6 @@ page-layout: full
 title-block-banner: true
 image: elev.png
 subtitle: "Site Report"
-
-# date: "Thursday, 12 December 2024"
 acknowledgements: |
     This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
 

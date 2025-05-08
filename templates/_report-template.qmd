@@ -1,11 +1,4 @@
----
-jupyter: python3
-execute:
-    eval: true
-    freeze: auto
----
-
-```{python}
+<!-- ```{python}
 # | echo: false
 # | tags: [parameters]
 project_name = None
@@ -18,34 +11,37 @@ unit_of_measure = None
 epsg = None
 crs = None
 
-```
+``` -->
 
-## Info
+{{< meta description `{python} project_description`>}}
 
-- **Project Name:** `{python} project_name`
-- **Project Description:** `{python} project_description`
-- **Project Location:** `{python} project_location`
+## Project Info
 
-## Maps
-
-### NAIP Imagery and Derived Products
-
-* NAIP: `{python} naip_year`
-
-| NAIP | NDVI |
-| --- | --- |
-| [![naip.png](naip.png)](naip.png) | [![ndvi.png](ndvi.png)](ndvi.png) |
-
-### 1st topographic derivatives
-
-* `{python} dem_resolution` DEM
 * Unit of measure: `{python} unit_of_measure`
 * EPSG: `{python} epsg`
 * CRS: `{python} crs`
 
-| Elevation | Elevation Histogram
-| --- | --- |
-| [![elev.png](elev.png)](elev.png) | [![elev_hist.png](elev_hist.png)](elev_hist.png) |
+### NAIP Imagery and Derived Products
+
+::: {#fig-imagery layout-ncol=2}
+[![NAIP `{python} naip_year`](naip.png)](naip.png){#fig-naip fig-alt='NAIP `{python} naip_year`' .lightbox}
+
+[![NDVI `{python} naip_year`](ndvi.png)](ndvi.png){#fig-ndvi fig-alt='NAIP `{python} naip_year` - NDVI' .lightbox}
+
+Data from the [The National Agriculture Imagery Program (NAIP)](https://naip-usdaonline.hub.arcgis.com/)
+:::
+
+## Geomorphology
+
+### 1st Order Derivatives
+
+::: {#fig-1st-derivatives layout-ncol=2}
+[![`{python} dem_resolution` DEM](elev.png)](elev.png){#fig-dem fig-alt='`{python} dem_resolution` DEM' .lightbox}
+
+[![Histogram](elev_hist.png)](elev_hist.png){#fig-ndvi fig-alt='Histogram' .lightbox}
+
+Digital Elevation Model (DEM) & Historgram
+:::
 
 ### 2nd order topographic derivatives
 

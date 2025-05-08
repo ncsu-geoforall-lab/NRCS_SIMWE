@@ -1,0 +1,48 @@
+---
+title: "SFREC"
+subtitle: "Site Report"
+description: Sierra Foothill Research & Extension Center
+site_image: "elev.png"
+
+author: Corey T. White
+date: May 8, 2025
+
+page-layout: full
+title-block-banner: true
+format: html
+
+execute:
+  freeze: auto
+jupyter: python3
+---
+
+```{python}
+# | echo: false
+# | tags: [parameters]
+
+project_name = "SFREC"
+project_description = "Sierra Foothill Research & Extension Center"
+project_location = "California"
+project_url = "https://ucanr.edu/research-and-extension-center/sierra-foothill-research-and-extension-center"
+naip_year = 2022
+dem_resolution = "1m"
+unit_of_measure = "meters"
+epsg = "26910"
+crs = "NAD83 / UTM zone 10N"
+```
+
+{{< include /templates/_report-template.qmd  >}}
+
+## Ground Water
+
+### Depth - Groundwater seepage in streams during rainfall
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![depth_rain_gw_04](ground_water2/depth_rain_gw_04.png) | ![depth_rain_gw_08](ground_water2/depth_rain_gw_08.png) | ![depth_rain_gw_12](ground_water2/depth_rain_gw_12.png) | ![depth_rain_gw_16](ground_water2/depth_rain_gw_16.png) | ![depth_rain_gw_20](ground_water2/depth_rain_gw_20.png)
+
+### Discharge - Groundwater seepage in streams during rainfall
+
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![disch_rain_gw_04](ground_water2/disch_rain_gw_04.png) | ![disch_rain_gw_08](ground_water2/disch_rain_gw_08.png) | ![disch_rain_gw_12](ground_water2/disch_rain_gw_12.png) | ![disch_rain_gw_16](ground_water2/disch_rain_gw_16.png) | ![disch_rain_gw_20](ground_water2/disch_rain_gw_20.png)

@@ -1,46 +1,35 @@
 ---
 title: "Coweeta"
 subtitle: "Site Report"
+description: Coweeta Hydrologic Laboratory, North Carolina
 site_image: "elev.png"
+
+author: Corey T. White
+date: May 8, 2025
+
 page-layout: full
 title-block-banner: true
-
 format: html
+
 execute:
   freeze: auto
 jupyter: python3
 ---
 
 ```{python}
-# | lable: generating-template
 # | echo: false
-# | output: false
+# | tags: [parameters]
 
-from IPython.display import display, HTML
-import subprocess
+project_name = "Coweeta"
+project_description = "Coweeta Hydrologic Laboratory"
+project_location = "Coweeta Hydrologic Laboratory, North Carolina"
+project_url = "https://research.fs.usda.gov/srs/forestsandranges/locations/coweeta"
+naip_year = 2021
+dem_resolution = "10m"
+unit_of_measure = "meters"
+epsg = "26917"
+crs = "CRS: NAD83 / UTM zone 17N"
 
-# Render the Quarto template and capture the output
-result = subprocess.run(
-    [
-        "quarto",
-        "render",
-        "../../templates/report-template.qmd",
-        "--execute-params",
-        "params.yml",
-        "--output",
-        "-",
-    ],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,
-)
 ```
 
-
-```{python}
-# | label: display-report
-# | echo: false
-
-# Display the rendered HTML output
-display(HTML(result.stdout))
-```
+{{< include /templates/_report-template.qmd  >}}

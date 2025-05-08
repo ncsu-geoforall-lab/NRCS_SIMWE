@@ -1,12 +1,12 @@
 ---
-title: Project Reports
+title: Site Reports
 subtitle: Study Sites
 listing:
     type: grid
     contents:
-        - ./clay-center/*.qmd
-        - ./coweeta/*.qmd
-        - ./SFREC
-        - ./SJER
-        - ./tx069-playas
+        - ./clay-center/report.qmd
+        - ./coweeta/report.qmd
+        - ./SFREC/report.qmd
+        - ./SJER/report.qmd
+        - ./tx069-playas/report.qmd
 ---

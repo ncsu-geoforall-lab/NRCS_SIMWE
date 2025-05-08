@@ -13,7 +13,7 @@ title-block-banner: false
 
 ## Purpose
 
-The purpose of this agreement, between the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and [North Carolina State University](https://ncsu.edu) (Recipient), is to adapt the SIMulation of Water and Erosion (SIMWE) model for the integration of Dynamic Soil Survey data. Proposed work will expand model capabilities, add supporting modules, and incorporate data input flexibility for integrating soil survey data. The updated model will serve as an important component of the future Dynamic Soil Survey at field to watershed scales and minute to monthly time-steps.
+The purpose of this agreement, between the [U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS)]({{< var funding.2.url >}}) and [North Carolina State University](https://ncsu.edu) (Recipient), is to adapt the SIMulation of Water and Erosion (SIMWE) model for the integration of Dynamic Soil Survey data. Proposed work will expand model capabilities, add supporting modules, and incorporate data input flexibility for integrating soil survey data. The updated model will serve as an important component of the future Dynamic Soil Survey at field to watershed scales and minute to monthly time-steps.
 
 ## Objectives
 
@@ -27,7 +27,7 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 
 ::: {.columns}
 
-::: {.column width="50%"}
+::: {.column width="32%"}
 
 ### Clay Center
 
@@ -36,20 +36,20 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 - [x] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-[Report](output/clay-center/report.qmd)
+[View Report](output/clay-center/report.qmd)
 
 :::
 
-::: {.column width="50%"}
+::: {.column width="32%"}
 
 ### Coweeta
 
-![coweeta3d](output/coweeta/elevation_3dmap.png)
+![](output/coweeta/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-[Report](output/coweeta/report.qmd)
+[View Report](output/coweeta/report.qmd)
 
 :::
 
@@ -57,29 +57,29 @@ The purpose of this agreement, between the U.S. Department of Agriculture, Natur
 
 ::: {.columns}
 
-::: {.column width="50%"}
+::: {.column width="32%"}
 
 ### SFREC
 
-![sfrec3d](output/SFREC/elevation_3dmap.png)
+![](output/SFREC/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-Report: [output/SFREC/report.md](output/SFREC/report.md)
+[View Report](output/SFREC/report.qmd)
 
 :::
 
-::: {.column width="50%"}
+::: {.column width="32%"}
 
 ### SJER
 
-![sjer3d](output/SJER/elevation_3dmap.png)
+![](output/SJER/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-Report: [output/SJER/report.md](output/SJER/report.md)
+[View Report](output/SJER/report.qmd)
 
 :::
 
@@ -87,16 +87,16 @@ Report: [output/SJER/report.md](output/SJER/report.md)
 
 ::: {.columns}
 
-::: {.column width="50%"}
+::: {.column width="32%"}
 
 ### tx069-playas
 
-![tx0693d](output/tx069-playas/elevation_3dmap.png)
+![](output/tx069-playas/elevation_3dmap.png)
 
 - [X] Create site projects in GRASS GIS
 - [x] Run basic SIMWE simulation
 
-Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
+[View Report](output/tx069-playas/report.qmd)
 
 :::
 
@@ -104,7 +104,7 @@ Report: [output/tx069-playas/report.md](output/tx069-playas/report.md)
 
 ## Basic Model Simulations Comparison
 
-![basic_simwe](notebooks/output/depth_fig.png)
+![](notebooks/output/depth_fig.png)
 
 ## Data
 
