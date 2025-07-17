@@ -18,6 +18,8 @@ import gettext
 import grass.script as gs
 import grass.script.core as gcore
 from grass.exceptions import CalledModuleError
+import tempfile
+import requests
 
 # Set up translation function
 _ = gettext.gettext
@@ -59,36 +61,50 @@ def region_to_wgs84_decimal_degrees_bbox():
     return bbox
 
 
-def region_to_crs_bbox(target_crs: str):
+def region_to_crs_bbox(target_crs: str) -> [float]:
     """Convert GRASS region bounds to a bounding box in another CRS using m.proj."""
     region = gs.region()
     # Extract corner coordinates
     west, south, east, north = region["w"], region["s"], region["e"], region["n"]
+    nsres = region["nsres"]
+    ewres = region["ewres"]
 
     # Format input coordinates for m.proj (as string input to stdin)
-    coords = f"{west} {south}\n{east} {north}\n"
+    coords = f"{west}|{south}\n{east}|{north}\n"
 
-    proj_in = gs.parse_command("g.proj", flags="j")
-    proj_out = gs.parse_command("g.proj", flags="j", proj=target_crs)
+    proj_in = gs.parse_command("g.proj", format="proj4", flags="pf")
+    gs.debug(_("region_to_crs_bbox: proj_in: %s" % proj_in))
+    proj_out = gs.parse_command("g.proj", format="proj4", srid=target_crs, flags="pf")
+    gs.debug(_("region_to_crs_bbox: proj_out: %s" % proj_out))
 
-    try:
-        output = gs.read_command(
-            "m.proj",
-            input="-",
-            proj_in=proj_in,
-            proj_out=proj_out,
-            stdin=coords,
-            quiet=True,
-        )
-    except CalledModuleError as e:
-        gs.fatal(f"Projection failed: {e}")
+    # We currently dont have an easy way to get arround needing a tempfile when
+    # we want to both pass an argument to stdin and we want the results added to the stdout
+    with tempfile.NamedTemporaryFile(
+        mode="w+t", prefix="r_soildb", suffix=".txt"
+    ) as fp:
+        try:
+            gs.write_command(
+                "m.proj",
+                input="-",
+                proj_in=f"+proj={proj_in['+proj']}",
+                proj_out=f"+proj={proj_out['+proj']}",
+                stdin=coords,
+                output=fp.name,
+                verbose=True,
+                quiet=False,
+                overwrite=True,
+            )
+        except CalledModuleError as e:
+            gs.fatal(f"Projection failed: {e}")
 
-    # Parse output
-    lines = output.strip().splitlines()
-    ll_x, ll_y = map(float, lines[0].split())  # Lower-left
-    ur_x, ur_y = map(float, lines[1].split())  # Upper-right
+        # Parse the tempfile output
+        lines = fp.readlines()
+        gs.message(_("Reproject Bounds for WCS query: %s" % lines))
+        clean_lines = [line.strip() for line in lines]
+        ll_x, ll_y, ll_z = map(float, clean_lines[0].split("|"))  # Lower-left
+        ur_x, ur_y, ur_z = map(float, clean_lines[1].split("|"))  # Upper-right
 
-    return [ll_x, ll_y, ur_x, ur_y]
+        return [ll_x, ll_y, ur_x, ur_y, ewres, nsres]
 
 
 def check_addon_installed(addon: str, fatal=True) -> None:
@@ -123,6 +139,56 @@ def validate_mukey(mukey: str, valid_mukeys: set = None) -> None:
         }
     if mukey.lower() not in valid_mukeys:
         raise InvalidMUKEYError(mukey, valid_mukeys)
+
+
+def mukey_to_ksat(mukey: str) -> str:
+    """
+    Convert MUKEY to Ksat (saturated hydraulic conductivity) string.
+
+    Args:
+        mukey (str): The MUKEY identifier.
+
+    Returns:
+        str: The Ksat string for the specified MUKEY.
+    """
+    mukey = mukey.lower()
+    if mukey == "gssurgo":
+        return "Ksat"
+    elif mukey == "statsgo":
+        return "Ksat"
+    elif mukey == "gnatsgo":
+        return "Ksat"
+    elif mukey == "hi_ssurgo":
+        return "Ksat"
+    elif mukey == "pr_ssurgo":
+        return "Ksat"
+    else:
+        raise ValueError(f"Unknown MUKEY '{mukey}'")
+
+
+def soil_texture(mukey: str, sand, clay, silt) -> str:
+    """
+    Convert MUKEY to soil texture string.
+
+    Args:
+        mukey (str): The MUKEY identifier.
+
+    Returns:
+        str: The soil texture string for the specified MUKEY.
+    """
+    mukey = mukey.lower()
+    if mukey == "gssurgo":
+        return "Texture"
+    elif mukey == "statsgo":
+        return "Texture"
+    elif mukey == "gnatsgo":
+        return "Texture"
+    elif mukey == "hi_ssurgo":
+        return "Texture"
+    elif mukey == "pr_ssurgo":
+        return "Texture"
+    else:
+        raise ValueError(f"Unknown MUKEY '{mukey}'")
 
 
 def lookup_mukey_crs(mukey: str) -> str:
@@ -162,9 +228,17 @@ class MUKEY_WCS:
         bbox (list): The bounding box coordinates for the area of interest.
     """
 
-    _base_url = "https://casoilresource.lawr.ucdavis.edu/cgi-bin/mapserv?"
-    _service_url = "map=/soilmap2/website/wcs/mukey.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage"
-    db = "gSSURGO"
+    _base_url = (
+        "https://casoilresource.lawr.ucdavis.edu/cgi-bin/mapserv?"
+        "map=/soilmap2/website/wcs/mukey.map&"
+        "SERVICE=WCS&"
+        "VERSION=2.0.1&"
+        "REQUEST=GetCoverage&"
+        "FORMAT=GEOTIFF_FLOAT&"
+        "GEOTIFF:COMPRESSION=DEFLATE&"
+        "FORMAT=image/tiff"
+    )
+    # _service_url = "map=/soilmap2/website/wcs/mukey.map&SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage"
     crs = "EPSG:5070"
 
     def __init__(
@@ -176,43 +250,56 @@ class MUKEY_WCS:
         self.project = None  # Use current project if not set
         self.crs = None  # CRS use to request data
 
-    def get_coverage(self, output: str = None) -> str:
-        """
-        Get the coverage for the specified MUKEY and bounding box.
+    def _debug(self, fun, msg):
+        """Print debug messages"""
+        gs.debug("%s.%s: %s" % (self.__class__.__name__, fun, msg))
 
-        This method constructs the URL for the WCS request and retrieves the
-        soil data for the specified MUKEY and bounding box.
+    def _generate_wcs_url(self):
+        crs = lookup_mukey_crs(self.mukey)
+        ll_x, ll_y, ur_x, ur_y, ewres, nsres = region_to_crs_bbox(crs)
+        url = (
+            f"{self._base_url}"
+            f"&coverage={self.mukey}"
+            f"&SUBSET={self.mukey}"
+            f"&SUBSETTINGCRS={crs}"
+            f"&SUBSET=x({ll_x},{ur_x})"
+            f"&SUBSET=y({ll_y},{ur_y})"
+            f"&RESOLUTION=x({ewres})"
+            f"&RESOLUTION=x({nsres})"
+        )
+        gs.debug("url: %s" % url)
+        print("url: %s" % url)
+        return url
 
-        Returns:
-            str: The URL for the WCS request.
-        """
-        check_addon_installed("r.in.wcs")
-        url_params = (
-            "SERVICE=WCS&VERSION=2.0.1&"
-            + "REQUEST=GetCoverage&"
-            + "FORMAT=image/tiff&"
-            + "GEOTIFF:COMPRESSION=DEFLATE"
+    def _download_geotiff(self, wcs_url, output_path):
+        """Download GeoTIFF from WCS URL to given file path."""
+        gs.message(_(f"Downloading data from: {wcs_url}"))
+        r = requests.get(wcs_url, stream=True)
+        if r.status_code == 200:
+            with open(output_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            gs.message(_("Download complete."))
+        else:
+            gs.fatal(_("Failed to download data: HTTP %s" % r.status_code))
+
+    def _import_geotiff_to_grass(self, input_tiff, output_raster):
+        """Import GeoTiFF into GRASS"""
+        gs.run_command(
+            "r.import", input=input_tiff, output=output_raster, overwrite=True
         )
 
-        crs = lookup_mukey_crs(self.mukey)
-
-        try:
-            gs.run_command(
-                "r.in.wcs",
-                url=self._base_url,
-                coverage=self.mukey,
-                urlparams=url_params,
-                output=output,
-                crs=crs,
-                location=self.project,
-                region=self.region,
-                flags="r",
-                verbose=True,
-                # overwrite=True,
-                # quiet=True,
-            )
-        except CalledModuleError as e:
-            gs.fatal(_("Error running r.in.wcs: {e}").format(e=e))
+    def fetch_wcs(self, *args, **kwargs):
+        """Fetch and import data from WMC server"""
+        self._debug("fetch_wcs", "started")
+        output_raster = kwargs["output_raster"]
+        download_path = kwargs["geotiff_path"]
+        url = self._generate_wcs_url()
+        self._download_geotiff(url, download_path)
+        self._import_geotiff_to_grass(
+            input_tif=download_path, output_raster=output_raster
+        )
+        self._debug("fetch_wcs", "ended")
 
 
 SOIL_PROPERTIES = {

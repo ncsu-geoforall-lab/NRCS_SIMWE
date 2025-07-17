@@ -21,7 +21,7 @@
 # %end
 
 # %option G_OPT_R_OUTPUT
-# % description: Name for output raster map of soil
+# % description: Name for output soil grid
 # %end
 
 # %option
@@ -36,7 +36,9 @@
 # % answer: input
 # %end
 
+import os
 import sys
+import tempfile
 import grass.script as gs
 from grass.pygrass.utils import get_lib_path
 from contextlib import contextmanager
@@ -84,10 +86,21 @@ def main():
             gs.fatal(f"Unable to import staclib: {err}")
 
     mukey = options["mukey"]
-    # output = options["output"]
+    output = options["output"]
 
     wcs = libsoil.MUKEY_WCS(mukey=mukey)
-    wcs.get_coverage()
+
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+        tif_path = tmp.name
+
+        try:
+            # Download and import
+            wcs.fetch_wcs(output_raster=output, geotiff_path=tif_path)
+        finally:
+            if os.path.exists(tif_path):
+                os.remove(tif_path)
+
+    # wcs.get_coverage()
 
 
 if __name__ == "__main__":
