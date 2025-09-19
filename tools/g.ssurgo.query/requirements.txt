@@ -1,0 +1,6 @@
+chromadb
+langchain
+langchain-chroma
+langchain-community
+pdfminer.six
+sqlparse
