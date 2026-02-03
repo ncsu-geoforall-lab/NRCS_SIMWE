@@ -73,7 +73,8 @@ def main():
             try:
                 project_name, projcrs, resolution, naip = line.split(":")
                 print(f"Project Name: {project_name}")
-                gj.init(f"{gisdb}/{project_name}/PERMANENT")
+                session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
+                tools = Tools(session=session, overwrite=True)
                 region_json = tools.g_region(
                     raster="elevation", res=resolution, flags="bwe", format="json"
                 ).json
@@ -92,9 +93,29 @@ def main():
                 crs_bbox_wkt = f"POLYGON(({crs_bbox[0]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[1]}))"
                 print(f"CRS BBOX: {crs_bbox}")
                 output = ksat_import(
-                    f"{data_path}", "example_project", crs_bbox_wkt, 30
+                    f"{data_path}", "example_project", crs_bbox_wkt, 30, tools
                 )
-                tools.v_info(map=output)
+                session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
+                tools = Tools(session=session, overwrite=True)
+                if output:
+                    new_vect = tools.g_list(type="vector", format="json").json
+                    print(f"{new_vect=}")
+                    cols = tools.v_info(map=output, format="json", flags="c").json
+                    print(cols)
+                    numeric_columns = [x for x in cols.get("columns") if x.get("is_number")]
+                    print(f"{numeric_columns=}")
+                    for i in numeric_columns:
+                        print(i)
+                        if i.get("name")!= "cat":
+                            tools.v_to_rast(
+                                input=output,
+                                type="area",
+                                use="attr",
+                                attribute_column=i.get("name"),
+                                output=i.get("name")
+                            )
+
+
 
             except ValueError:
                 exit(1)
@@ -107,7 +128,7 @@ def main():
     # ksat_import(f"{data_path}", "example_project", bbox_wtk, 30)
 
 
-def ksat_import(db_path, project_name, bbox_wkt, resolution):
+def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
     # Connect to DuckDB
     # db_config = {"threads": 1}
     con = duckdb.connect(read_only=False)
@@ -134,39 +155,88 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution):
     # Execute the query and fetch data
     ksat_data = con.execute(query, [bbox_wkt]).fetchdf()
     ksat_data.describe()
+    if ksat_data.size == 0:
+        print("No records found in your region.")
+        return None
 
     # Export to GRASS using GDAL/OGR_GRASS driver
     tempdir = tempfile.TemporaryDirectory()
-    tempname = f"tmp_{project_name}_5050"
-    gs.create_project(path=tempdir.name, name=tempname, epsg=5070, overwrite=True)
+    temp_project = f"tmp_{project_name}_5050"
+
+    gs.create_project(path=tempdir.name, name=temp_project, epsg=26917, overwrite=True)
+    session = gj.init(Path(tempdir.name, temp_project))
+
+    # help(session)
+    for child in Path(tempdir.name, temp_project).iterdir():
+        print(child)
     # grass_dsn = f"GRASS:{Path(tempdir.name) / tempname}"
     output_layer = f"{project_name}_mupolygon"
-    gdal_option = (
-        f"{Path(tempdir.name) / tempname}/PERMANENT/vector/{output_layer}/head"
-    )
+    # gdal_option = (
+    #     f"{Path(tempdir.name) / tempname}/PERMANENT/vector/{output_layer}/head"
+    # )
+
     # Export SSURGO data to GRASS
     # Need to check if GRASS driver is available
-    df_drivers = con.execute("SELECT * FROM ST_Drivers();").fetchdf()
-    for _, row in df_drivers.iterrows():
-        print(row.get("short_name"), row.get("can_create"))
+    # df_drivers = con.execute("SELECT * FROM ST_Drivers();").fetchdf()
+    # for _, row in df_drivers.iterrows():
+    #     print(row.get("short_name"), row.get("can_create"))
         # gs.message(f"Driver: {_}, Can Write: {row}")
 
-    export_sql = f"""
-    COPY (
-        {query.strip()}
-    ) TO '{gdal_option}'
-    (FORMAT GDAL, DRIVER 'OGR_GRASS', SRS 'EPSG:5070');
-    """
-    con.execute(export_sql, [bbox_wkt])
+    fd, tmp_filepath = tempfile.mkstemp()
+    # GRASS GDAL driver isn't supported by duckdb
+    print(f"Tempfile Path: {tmp_filepath}")
+    try:
+        export_sql = f"""
+        COPY (
+            {query.strip()}
+        ) TO '{tmp_filepath}'
+        (FORMAT GDAL, DRIVER 'FlatGeobuf', SRS 'EPSG:26917');
+        """
 
-    # Reproject to current GRASS project
-    tools.v_proj(
-        project=f"{Path(tempdir.name) / tempname}",
-        input=output_layer,
-        output=f"{project_name}_ssurgo",
-    )
-    tempdir.cleanup()
-    return f"{project_name}_ssurgo"
+        con.execute(export_sql, [bbox_wkt])
+
+        # Create a new GRASS session for the temp dataset
+        with Tools(session=session) as t:
+            session_env = t.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep='/').text
+            print(f"Session info: {session_env}")
+            t.v_in_ogr(
+                input=tmp_filepath,
+                output=output_layer,
+                type="boundary",
+                snap=0.001
+            )
+
+            new_vect = t.g_list(type="vector", format="json").json
+            print(f"{new_vect=}")
+
+        # Reproject dataset from temp project to the current GRASS project
+        print("Reprojecting ssurgo data")
+        tools.v_proj(
+            project=temp_project,
+            input=output_layer,
+            dbase=tempdir.name,
+            mapset="PERMANENT",
+            output=output_layer,
+        )
+
+
+
+    finally:
+        print("CLeaning up temp project")
+        tempdir.cleanup()
+        print(f"{tmp_filepath=}")
+        print(f"Is Dir: {Path(tmp_filepath).is_dir()}")
+        print(f"Is file: {Path(tmp_filepath).is_file()}")
+        tmp_files = Path(tmp_filepath).name
+        print(f"Tempfile Name: {tmp_files=}")
+        # print(f"Temp files: {list(tmp_files)}")
+        # for f in tmp_files:
+        #     print (f"Removing file {f=}")
+        #     f.unlink()
+        # Path(tmp_filepath).rmdir()
+        print("cleaned up temp FlatGeoBuff")
+
+    return output_layer
 
 
 if __name__ == "__main__":
@@ -181,6 +251,5 @@ if __name__ == "__main__":
     from grass.tools import Tools
     from grass.exceptions import CalledModuleError
 
-    tools = Tools(overwrite=True)
     # Execute the main function
     sys.exit(main())
