@@ -86,7 +86,7 @@ def update_hydrologic_group(tools, vector_map, source_col="hydgrp", target_col="
     Ensure an integer Hydrologic Soil Group (HSG) column exists on the vector and populate it from source_col.
     Mapping:
       A->1, B->2, C->3, D->4
-      AD->11, BD->12, CD->13, DD->14 (dual drained/undrained codes)
+      A/D->11, B/D->12, C/D->13, D/D->14 (dual drained/undrained codes)
     Skips unknown/ambiguous codes.
     """
     # Ensure target column exists
@@ -103,10 +103,10 @@ def update_hydrologic_group(tools, vector_map, source_col="hydgrp", target_col="
         "B": 2,
         "C": 3,
         "D": 4,
-        "AD": 11,  # A/D
-        "BD": 12,  # B/D
-        "CD": 13,  # C/D
-        "DD": 14,  # D/D
+        "A/D": 11,  # A/D
+        "B/D": 12,  # B/D
+        "C/D": 13,  # C/D
+        "D/D": 14,  # D/D
         # keep ambiguous combos out (AB, AC, BC, etc.) unless you have a rule
     }
 
