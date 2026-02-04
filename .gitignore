@@ -180,3 +180,6 @@ docs/
 .ruff_cache/
 
 **/*.quarto_ipynb
+test_keyvalue_result.txt
+
+data/*.zip
