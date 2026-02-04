@@ -64,6 +64,67 @@ def region_to_crs_bbox(target_crs: str) -> [float]:
         return [ll_x, ll_y, ur_x, ur_y]
 
 
+def hydrologic_group_lookup(hydgrp_code):
+    """Lookup table for hydrologic group codes to descriptions."""
+    lookup = {
+        "A": "Low runoff potential",
+        "B": "Moderate runoff potential",
+        "C": "High runoff potential",
+        "D": "Very high runoff potential",
+        "AB": "Between A and B",
+        "AC": "Between A and C",
+        "AD": "Between A and D",
+        "BC": "Between B and C",
+        "BD": "Between B and D",
+        "CD": "Between C and D",
+    }
+    return lookup.get(hydgrp_code, "Unknown")
+
+
+def update_hydrologic_group(tools, vector_map, source_col="hydgrp", target_col="hsg"):
+    """
+    Ensure an integer Hydrologic Soil Group (HSG) column exists on the vector and populate it from source_col.
+    Mapping:
+      A->1, B->2, C->3, D->4
+      AD->11, BD->12, CD->13, DD->14 (dual drained/undrained codes)
+    Skips unknown/ambiguous codes.
+    """
+    # Ensure target column exists
+    cols = tools.v_info(map=vector_map, format="json", flags="c").json.get(
+        "columns", []
+    )
+    col_names = [c["name"] for c in cols]
+    if target_col not in col_names:
+        tools.v_db_addcolumn(map=vector_map, columns=f"{target_col} INTEGER")
+
+    # Mapping from hydgrp text to numeric HSG
+    mapping = {
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "AD": 11,  # A/D
+        "BD": 12,  # B/D
+        "CD": 13,  # C/D
+        "DD": 14,  # D/D
+        # keep ambiguous combos out (AB, AC, BC, etc.) unless you have a rule
+    }
+
+    # Update rows for each mapping entry (handle uppercase/lowercase)
+    for code, num in mapping.items():
+        where = f"{source_col} = '{code}' OR {source_col} = '{code.lower()}'"
+        tools.v_db_update(
+            map=vector_map, column=target_col, value=str(num), where=where
+        )
+
+    # Optionally set unmatched values to NULL (skip here) or 0:
+    tools.v_db_update(
+        map=vector_map, column=target_col, value="NULL", where=f"{target_col} IS NULL"
+    )
+
+    return target_col
+
+
 # Define main function
 def main():
     project_name = None
@@ -73,8 +134,8 @@ def main():
             try:
                 project_name, projcrs, resolution, naip = line.split(":")
                 print(f"Project Name: {project_name}")
-                session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
-                tools = Tools(session=session, overwrite=True)
+                main_session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
+                tools = Tools(session=main_session, overwrite=True)
                 region_json = tools.g_region(
                     raster="elevation", res=resolution, flags="bwe", format="json"
                 ).json
@@ -93,29 +154,35 @@ def main():
                 crs_bbox_wkt = f"POLYGON(({crs_bbox[0]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[1]}))"
                 print(f"CRS BBOX: {crs_bbox}")
                 output = ksat_import(
-                    f"{data_path}", "example_project", crs_bbox_wkt, 30, tools
+                    f"{data_path}", project_name, crs_bbox_wkt, 30, tools
                 )
                 session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
-                tools = Tools(session=session, overwrite=True)
-                if output:
-                    new_vect = tools.g_list(type="vector", format="json").json
-                    print(f"{new_vect=}")
-                    cols = tools.v_info(map=output, format="json", flags="c").json
-                    print(cols)
-                    numeric_columns = [x for x in cols.get("columns") if x.get("is_number")]
-                    print(f"{numeric_columns=}")
-                    for i in numeric_columns:
-                        print(i)
-                        if i.get("name")!= "cat":
-                            tools.v_to_rast(
-                                input=output,
-                                type="area",
-                                use="attr",
-                                attribute_column=i.get("name"),
-                                output=i.get("name")
-                            )
-
-
+                with Tools(session=session, overwrite=True) as mtools:
+                    session_env = mtools.g_gisenv(
+                        get="GISDBASE,LOCATION_NAME,MAPSET", sep="/"
+                    ).text
+                    print(f"Session info: {session_env}")
+                    if output:
+                        print("Checking data was imported correctly...")
+                        new_vect = mtools.g_list(type="vector", format="json").json
+                        print(f"{new_vect=}")
+                        update_hydrologic_group(mtools, output)
+                        cols = mtools.v_info(map=output, format="json", flags="c").json
+                        print(f"{cols=}")
+                        numeric_columns = [
+                            x for x in cols.get("columns") if x.get("is_number")
+                        ]
+                        print(f"{numeric_columns=}")
+                        for i in numeric_columns:
+                            print(i)
+                            if i.get("name") != "cat":
+                                mtools.v_to_rast(
+                                    input=output,
+                                    type="area",
+                                    use="attr",
+                                    attribute_column=i.get("name"),
+                                    output=i.get("name"),
+                                )
 
             except ValueError:
                 exit(1)
@@ -144,9 +211,13 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
     SELECT mu.geom,
            c.mukey,
            c.cokey,
+           c.compname,
            c.comppct_r,
            c.runoff,
            c.hydgrp,
+           c.hydricon,
+           c.hydricrating,
+           c.drainagecl,
            ROW_NUMBER() OVER (PARTITION BY c.mukey ORDER BY c.comppct_r DESC) AS rn
     FROM ST_Read('{db_path}', layer='component') AS c
     INNER JOIN mu ON mu.mukey = c.mukey
@@ -161,28 +232,14 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
 
     # Export to GRASS using GDAL/OGR_GRASS driver
     tempdir = tempfile.TemporaryDirectory()
-    temp_project = f"tmp_{project_name}_5050"
+    temp_project = f"tmp_{project_name}_5070"
 
-    gs.create_project(path=tempdir.name, name=temp_project, epsg=26917, overwrite=True)
-    session = gj.init(Path(tempdir.name, temp_project))
-
-    # help(session)
-    for child in Path(tempdir.name, temp_project).iterdir():
-        print(child)
-    # grass_dsn = f"GRASS:{Path(tempdir.name) / tempname}"
+    gs.create_project(path=tempdir.name, name=temp_project, epsg=5070, overwrite=True)
+    temp_session = gj.init(Path(tempdir.name, temp_project))
     output_layer = f"{project_name}_mupolygon"
-    # gdal_option = (
-    #     f"{Path(tempdir.name) / tempname}/PERMANENT/vector/{output_layer}/head"
-    # )
 
-    # Export SSURGO data to GRASS
-    # Need to check if GRASS driver is available
-    # df_drivers = con.execute("SELECT * FROM ST_Drivers();").fetchdf()
-    # for _, row in df_drivers.iterrows():
-    #     print(row.get("short_name"), row.get("can_create"))
-        # gs.message(f"Driver: {_}, Can Write: {row}")
+    fd, tmp_filepath = tempfile.mkstemp(suffix=".fgb")
 
-    fd, tmp_filepath = tempfile.mkstemp()
     # GRASS GDAL driver isn't supported by duckdb
     print(f"Tempfile Path: {tmp_filepath}")
     try:
@@ -190,50 +247,55 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
         COPY (
             {query.strip()}
         ) TO '{tmp_filepath}'
-        (FORMAT GDAL, DRIVER 'FlatGeobuf', SRS 'EPSG:26917');
+        (FORMAT GDAL, DRIVER 'FlatGeobuf', SRS 'EPSG:5070');
         """
 
         con.execute(export_sql, [bbox_wkt])
 
         # Create a new GRASS session for the temp dataset
-        with Tools(session=session) as t:
-            session_env = t.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep='/').text
-            print(f"Session info: {session_env}")
+        with Tools(session=temp_session) as t:
+            print("#" * 50)
+            print("Starting temp GRASS session for SSURGO import...")
+            session_env = t.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep="/").text
+            print(f"Temp Session info: {session_env}")
             t.v_in_ogr(
-                input=tmp_filepath,
-                output=output_layer,
-                type="boundary",
-                snap=0.001
+                input=tmp_filepath, output=output_layer, type="boundary", snap=0.0001
             )
 
             new_vect = t.g_list(type="vector", format="json").json
-            print(f"{new_vect=}")
+            print(f"Temp Session Vectors: {new_vect}")
 
         # Reproject dataset from temp project to the current GRASS project
-        print("Reprojecting ssurgo data")
-        tools.v_proj(
-            project=temp_project,
-            input=output_layer,
-            dbase=tempdir.name,
-            mapset="PERMANENT",
-            output=output_layer,
-        )
+        new_session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
+        with Tools(session=new_session, overwrite=True) as mtools:
+            print("#" * 50)
+            session_env = mtools.g_gisenv(
+                get="GISDBASE,LOCATION_NAME,MAPSET", sep="/"
+            ).text
+            print(f"Return to last session: {session_env}")
+            print("Reprojecting ssurgo data...")
 
+            mtools.v_proj(
+                project=temp_project,
+                input=output_layer,
+                dbase=tempdir.name,
+                mapset="PERMANENT",
+                output=output_layer,
+                verbose=True,
+            )
 
+    except CalledModuleError as e:
+        print(f"Import failed: {e}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
     finally:
-        print("CLeaning up temp project")
+        print("cleaning up temp project")
         tempdir.cleanup()
-        print(f"{tmp_filepath=}")
-        print(f"Is Dir: {Path(tmp_filepath).is_dir()}")
-        print(f"Is file: {Path(tmp_filepath).is_file()}")
-        tmp_files = Path(tmp_filepath).name
-        print(f"Tempfile Name: {tmp_files=}")
-        # print(f"Temp files: {list(tmp_files)}")
-        # for f in tmp_files:
-        #     print (f"Removing file {f=}")
-        #     f.unlink()
-        # Path(tmp_filepath).rmdir()
+        print(f"Tempfile Name: {tmp_filepath=}")
+        os.close(fd)
+        os.remove(tmp_filepath)
         print("cleaned up temp FlatGeoBuff")
 
     return output_layer
