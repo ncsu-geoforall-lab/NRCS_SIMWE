@@ -15,6 +15,7 @@
 import sys
 from contextlib import contextmanager
 import gettext
+import textwrap
 import grass.script as gs
 import grass.script.core as gcore
 from grass.exceptions import CalledModuleError
@@ -300,6 +301,138 @@ class MUKEY_WCS:
             input_tif=download_path, output_raster=output_raster
         )
         self._debug("fetch_wcs", "ended")
+
+    def build_sda_sql(aoi_wkt, top_cm, bottom_cm, agg):
+        """
+        Build one SQL batch that:
+        1) gets intersecting mukeys from AOI WKT (WGS84)
+        2) aggregates ksat to mapunit (mukey)
+        3) returns mupolygon WKT + mukey + ksat
+
+        Uses SDA helper functions described in Advanced Queries.
+        """
+        # Depth-weighted mean within [top_cm, bottom_cm]
+        # thickness = max(0, min(hzdepb_r, bottom) - max(hzdept_r, top))
+        # Ksat RV: chorizon.ksat_r
+        #
+        # dominant_component: pick component with max comppct_r for each mukey
+        #
+        # weighted_component: weight components by comppct_r and depth-weight horizons per component
+
+        top = float(top_cm)
+        bottom = float(bottom_cm)
+
+        if agg == "dominant_component":
+            ksat_cte = f"""
+            WITH mu AS (
+            SELECT * FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('{aoi_wkt}')
+            ),
+            dom_comp AS (
+            SELECT c.mukey, c.cokey, c.comppct_r,
+                    ROW_NUMBER() OVER (PARTITION BY c.mukey ORDER BY c.comppct_r DESC) AS rn
+            FROM component c
+            INNER JOIN mu ON mu.mukey = c.mukey
+            WHERE c.comppct_r IS NOT NULL
+            ),
+            dom AS (
+            SELECT mukey, cokey FROM dom_comp WHERE rn = 1
+            ),
+            hz AS (
+            SELECT d.mukey,
+                    CASE
+                    WHEN SUM(thk) = 0 THEN NULL
+                    ELSE SUM(thk * ksat_r) / SUM(thk)
+                    END AS ksat
+            FROM (
+                SELECT d.mukey,
+                    h.ksat_r,
+                    CASE
+                        WHEN h.hzdept_r IS NULL OR h.hzdepb_r IS NULL THEN 0
+                        ELSE
+                        CASE
+                            WHEN (CASE WHEN h.hzdepb_r < {bottom} THEN h.hzdepb_r ELSE {bottom} END)
+                                - (CASE WHEN h.hzdept_r > {top} THEN h.hzdept_r ELSE {top} END) > 0
+                            THEN (CASE WHEN h.hzdepb_r < {bottom} THEN h.hzdepb_r ELSE {bottom} END)
+                                - (CASE WHEN h.hzdept_r > {top} THEN h.hzdept_r ELSE {top} END)
+                            ELSE 0
+                        END
+                    END AS thk
+                FROM dom d
+                INNER JOIN chorizon h ON h.cokey = d.cokey
+                WHERE h.ksat_r IS NOT NULL
+            ) x
+            GROUP BY d.mukey
+            ),
+            poly AS (
+            -- get all polygons for the intersecting mukeys
+            SELECT t.mukey, p.MupolygonWktWgs84 AS wkt
+            FROM (SELECT mukey FROM mu) t
+            CROSS APPLY SDA_Get_MupolygonWktWgs84_from_Mukey(t.mukey) p
+            )
+            SELECT poly.mukey, hz.ksat, poly.wkt
+            FROM poly
+            LEFT JOIN hz ON hz.mukey = poly.mukey
+            """
+        else:
+            # weighted_component
+            ksat_cte = f"""
+            WITH mu AS (
+            SELECT * FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('{aoi_wkt}')
+            ),
+            comp AS (
+            SELECT c.mukey, c.cokey, c.comppct_r
+            FROM component c
+            INNER JOIN mu ON mu.mukey = c.mukey
+            WHERE c.comppct_r IS NOT NULL
+            ),
+            comp_hz AS (
+            SELECT c.mukey, c.cokey, c.comppct_r,
+                    CASE
+                    WHEN SUM(thk) = 0 THEN NULL
+                    ELSE SUM(thk * ksat_r) / SUM(thk)
+                    END AS ksat_comp
+            FROM (
+                SELECT c.mukey, c.cokey, c.comppct_r,
+                    h.ksat_r,
+                    CASE
+                        WHEN h.hzdept_r IS NULL OR h.hzdepb_r IS NULL THEN 0
+                        ELSE
+                        CASE
+                            WHEN (CASE WHEN h.hzdepb_r < {bottom} THEN h.hzdepb_r ELSE {bottom} END)
+                                - (CASE WHEN h.hzdept_r > {top} THEN h.hzdept_r ELSE {top} END) > 0
+                            THEN (CASE WHEN h.hzdepb_r < {bottom} THEN h.hzdepb_r ELSE {bottom} END)
+                                - (CASE WHEN h.hzdept_r > {top} THEN h.hzdept_r ELSE {top} END)
+                            ELSE 0
+                        END
+                    END AS thk
+                FROM comp c
+                INNER JOIN chorizon h ON h.cokey = c.cokey
+                WHERE h.ksat_r IS NOT NULL
+            ) z
+            GROUP BY mukey, cokey, comppct_r
+            ),
+            hz AS (
+            SELECT mukey,
+                    CASE
+                    WHEN SUM(comppct_r) = 0 THEN NULL
+                    ELSE SUM(comppct_r * ksat_comp) / SUM(comppct_r)
+                    END AS ksat
+            FROM comp_hz
+            WHERE ksat_comp IS NOT NULL
+            GROUP BY mukey
+            ),
+            poly AS (
+            SELECT t.mukey, p.MupolygonWktWgs84 AS wkt
+            FROM (SELECT mukey FROM mu) t
+            CROSS APPLY SDA_Get_MupolygonWktWgs84_from_Mukey(t.mukey) p
+            )
+            SELECT poly.mukey, hz.ksat, poly.wkt
+            FROM poly
+            LEFT JOIN hz ON hz.mukey = poly.mukey
+            """
+
+        # SDA likes a single batch; keep it as-is
+        return textwrap.dedent(ksat_cte).strip()
 
 
 SOIL_PROPERTIES = {

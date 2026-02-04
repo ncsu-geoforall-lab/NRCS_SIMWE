@@ -178,3 +178,5 @@ docs/
 
 # Ruff
 .ruff_cache/
+
+**/*.quarto_ipynb
