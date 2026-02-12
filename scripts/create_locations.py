@@ -11,8 +11,7 @@ def main():
     with open("site-CRS-info.txt", "r") as file:
         data = file.readlines()
         for line in data:
-
-            location_name, projcrs = line.split(":")
+            location_name, projcrs, res, naip_year = line.split(":")
 
             # Check if location name and PROJCRS were found
             if location_name is None:
@@ -24,7 +23,9 @@ def main():
                 exit(1)
 
             # Create the GRASS GIS location
-            grass_command = f"grass -c EPSG:{projcrs.strip()} '{gisdb}/{location_name}' -e"  # noqa: E501
+            grass_command = (
+                f"grass -c EPSG:{projcrs.strip()} '{gisdb}/{location_name}' -e"  # noqa: E501
+            )
             print(f"Creating location: {grass_command}")
             process = subprocess.Popen(
                 grass_command, shell=True, stdout=subprocess.PIPE
