@@ -2,15 +2,27 @@
 
 ## Purpose
 
-The purpose of this agreement, between the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and North Carolina State University (Recipient), is to adapt the SIMulation of Water and Erosion (SIMWE) model for the integration of Dynamic Soil Survey data. Proposed work will expand model capabilities, add supporting modules, and incorporate data input flexibility for integrating soil survey data. The updated model will serve as an important component of the future Dynamic Soil Survey at field to watershed scales and minute to monthly time-steps.
+The purpose of this agreement, between the U.S. Department of Agriculture,
+Natural Resources Conservation Service (NRCS) and North Carolina State
+University (Recipient), is to adapt the SIMulation of Water and Erosion
+(SIMWE) model for the integration of Dynamic Soil Survey data. Proposed
+work will expand model capabilities, add supporting modules, and
+incorporate data input flexibility for integrating soil survey data.
+The updated model will serve as an important component of the future
+Dynamic Soil Survey at field to watershed scales and minute to monthly
+time-steps.
 
 ## Objectives
 
-- [WIP] Develop pre-processing modules to translate basic soil properties and site conditions into model input parameters.
-- [WIP] Perform a sensitivity analysis to identify optimal ranges of and interactions between model input parameters.
+- [WIP] Develop pre-processing modules to translate basic soil properties
+and site conditions into model input parameters.
+- [WIP] Perform a sensitivity analysis to identify optimal ranges of
+and interactions between model input parameters.
 - [ ] Explore the capability of the model to accept and utilize time-varying inputs.
-- [ ] Expand model capabilities to include multiple and consecutive rainfall events and account for antecedent conditions.
-- [ ] Develop multilayer SIMWE model simulations that account for multiple subsurface soil layers.
+- [ ] Expand model capabilities to include multiple and consecutive
+rainfall events and account for antecedent conditions.
+- [ ] Develop multilayer SIMWE model simulations that account
+for multiple subsurface soil layers.
 
 ## Sites
 
@@ -99,7 +111,8 @@ pip install -r requirements.txt
 
 1. Create Site Projects in GRASS
 
-    Run the python script `scripts/create_locations.py` to create site projects in GRASS GIS.
+    Run the python script `scripts/create_locations.py` to create
+    site projects in GRASS.
 
     ```bash
     python scripts/create_locations.py
@@ -107,7 +120,8 @@ pip install -r requirements.txt
 
 2. Download Data
 
-    Run the python script `scripts/download_data.py` to download data for the site projects.
+    Run the python script `scripts/download_data.py` to download data
+    for the site projects.
 
     ```bash
     python scripts/download_data.py
@@ -115,7 +129,8 @@ pip install -r requirements.txt
 
 3. Calcuate 1st and 2nd order derivatives
 
-    Run the python script `scripts/geomorphology.py` to calculate 1st and 2nd order derivatives.
+    Run the python script `scripts/geomorphology.py` to calculate
+    1st and 2nd order derivatives.
 
     ```bash
     python scripts/calculate_derivatives.py
@@ -123,7 +138,8 @@ pip install -r requirements.txt
 
 ## Simulations
 
-Run the python script `scripts/simulation.py` to downlaod data and run the SIMWE model.
+Run the python script `scripts/simulation.py` to downlaod data and run
+the SIMWE model.
 
 ```bash
 python scripts/simulation.py
@@ -139,7 +155,9 @@ python scripts/sensitivity.py
 
 ## Acknowledgements
 
-This project is supported by the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) and North Carolina State University.
+This project is supported by the U.S. Department of Agriculture,
+Natural Resources Conservation Service (NRCS) and North
+Carolina State University.
 
 ## Contributors
 
