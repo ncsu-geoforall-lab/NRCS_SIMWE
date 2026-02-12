@@ -12,4 +12,5 @@ listing:
      - "model_run_variability.qmd"
      - "sensitivity_analysis.qmd"
      - "workshop.ipynb"
+     - "ssurgo.qmd"
 ---

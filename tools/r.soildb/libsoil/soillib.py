@@ -21,9 +21,62 @@ import grass.script.core as gcore
 from grass.exceptions import CalledModuleError
 import tempfile
 import requests
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+import json
+from enum import Enum
+from pathlib import Path
 
 # Set up translation function
 _ = gettext.gettext
+
+MICROMETERS_PER_SECOND_TO_MM_PER_HOUR = 3.6  # Conversion factor
+
+# Notes:
+
+##### Infiltration Concepts #####
+# Infiltration Rate - The rate at which water infiltrates into the ground at any given
+# moment, regardless of the current soil saturation level.
+# Ksat (Saturated Hydraulic Conductivity of Soil) - is the infiltration rate once the ground
+# has reached 100% saturation and the infiltration rate has become constant.
+
+##### Rainfall excess models #####
+# SCS Curve Number Method - Uses hydrologic soil groups (HSG) A, B, C, D to estimate runoff
+# based on soil infiltration rates, land use, and antecedent moisture conditions.
+
+##### Emprical Infiltration Models #####
+# Horton Infiltration Model - Uses initial and final infiltration rates along with a decay constant
+# to describe how infiltration decreases over time.
+# Kostiakov Model - An empirical model that describes infiltration rate as a function of time
+# Holtan Model - An empirical model that relates infiltration rate to cumulative infiltration.
+
+##### Approximate Theory-Based Models #####
+
+# Green-Ampt Model - A physically based model that considers soil properties and wetting front
+# movement to estimate infiltration.
+#
+# parameters:
+# K - the effective hydraulic conductivity of the soil [cm/h]
+# S - the wetting front suction head [cm]
+# phi - the soil porosity
+# theta_i - the initial volumetric water content [L^3 L^-3]
+#
+# BD (Soil Bulk Density) = 100 / (% Organic Matter / Organic Matter bulk density) + ((100 - % Organic Matter) / Mineral bulk density))
+#
+# where:
+# BD = Bulk Density of <2-mm material, (g/cm³)
+# S = Percent sand content of the soil
+# OM = Percent organic matter content of the soil
+# C = Percent clay content of the soil
+# CEC = Cation exchange capacity of the soil (cmol(+)/kg)
+#   CEC ranges from 0.1 - 0.9
+#
+# Philip's Model - A model that uses sorptivity and steady-state infiltration rate to describe
+# infiltration behavior over time.
+
+# GRASS (r.sim.water)
+# parameter: infil - Name of runoff infiltration rate raster map [mm/hr]
+# parameter: rain - Name of rainfall excess rate (rain-infilt) raster map [mm/hr]
 
 
 @contextmanager
@@ -52,6 +105,15 @@ def add_sys_path(new_path: str):
         sys.path = original_sys_path
 
 
+def check_if_zipfile(file_path: Path) -> Path:
+    """Check if the provided file path is a ZIP file."""
+    if not file_path.is_file():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    if file_path.suffix.lower() == ".zip":
+        return Path("/vsizip") / file_path.relative_to(file_path.anchor)
+    return file_path
+
+
 def region_to_wgs84_decimal_degrees_bbox():
     """convert region bbox to wgs84 decimal degrees bbox"""
     region = gs.parse_command("g.region", quiet=True, flags="ubg")
@@ -60,6 +122,13 @@ def region_to_wgs84_decimal_degrees_bbox():
         for c in [region["ll_w"], region["ll_s"], region["ll_e"], region["ll_n"]]
     ]
     return bbox
+
+
+def region_to_wkt_wgs84():
+    """Convert GRASS region bounds to a WKT polygon in WGS84."""
+    west, south, east, north = region_to_wgs84_decimal_degrees_bbox()
+    wkt = f"POLYGON(({west} {south}, {east} {south}, {east} {north}, {west} {north}, {west} {south}))"
+    return wkt
 
 
 def region_to_crs_bbox(target_crs: str) -> [float]:
@@ -106,6 +175,14 @@ def region_to_crs_bbox(target_crs: str) -> [float]:
         ur_x, ur_y, ur_z = map(float, clean_lines[1].split("|"))  # Upper-right
 
         return [ll_x, ll_y, ur_x, ur_y, ewres, nsres]
+
+
+def region_to_crs_wkt(target_crs: str = "EPSG:5070") -> str:
+    """Convert GRASS region bounds to a WKT polygon in another CRS using m.proj."""
+    west, south, east, north = region_to_crs_bbox(target_crs)[:4]
+    wkt = f"POLYGON(({west} {south}, {east} {south}, {east} {north}, {west} {north}, {west} {south}))"
+    gs.debug(_("region_to_crs_wkt: wkt: %s" % wkt))
+    return wkt
 
 
 def check_addon_installed(addon: str, fatal=True) -> None:
@@ -302,7 +379,25 @@ class MUKEY_WCS:
         )
         self._debug("fetch_wcs", "ended")
 
-    def build_sda_sql(aoi_wkt, top_cm, bottom_cm, agg):
+
+class SoilAggMethod(Enum):
+    DOMINANT_COMPONENT = "dominant_component"
+    WEIGHTED_COMPONENT = "weighted_component"
+
+
+class SDAClient:
+    """
+    Client for interacting with the Soil Data Access (SDA) database.
+
+    This class provides methods to execute SQL queries against the SDA database
+    and retrieve soil data based on specified parameters.
+    """
+
+    REST_URL = (
+        "https://SDMDataAccess.sc.egov.usda.gov/Tabular/SDMTabularService/post.rest"
+    )
+
+    def _build_sda_sql(self, aoi_wkt, top_cm: int, bottom_cm: int, agg: SoilAggMethod):
         """
         Build one SQL batch that:
         1) gets intersecting mukeys from AOI WKT (WGS84)
@@ -322,7 +417,7 @@ class MUKEY_WCS:
         top = float(top_cm)
         bottom = float(bottom_cm)
 
-        if agg == "dominant_component":
+        if agg == SoilAggMethod.DOMINANT_COMPONENT:
             ksat_cte = f"""
             WITH mu AS (
             SELECT * FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('{aoi_wkt}')
@@ -433,6 +528,45 @@ class MUKEY_WCS:
 
         # SDA likes a single batch; keep it as-is
         return textwrap.dedent(ksat_cte).strip()
+
+    def _sda_post_sql(self, sql, sda_url, timeout=120):
+        """
+        POST SQL to SDA post.rest. Request JSON output.
+        SDA post.rest documented on SDA web service help page.
+        """
+        headers = {
+            "Content-Type": "text/sql",
+            "Accept": "application/json",
+        }
+        req = Request(sda_url, data=sql.encode("utf-8"), headers=headers, method="POST")
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                data = resp.read().decode("utf-8", errors="replace")
+                return json.loads(data)
+        except HTTPError as e:
+            raise gs.fatal(f"SDA HTTP error {e.code}: {e.reason}")
+        except URLError as e:
+            raise gs.fatal(f"SDA connection error: {e.reason}")
+        except json.JSONDecodeError:
+            raise gs.fatal(
+                "SDA did not return JSON. Try changing SDA format or check service status."
+            )
+
+    def fetch_sda(
+        self,
+        aoi_wkt,
+        top_cm: int,
+        bottom_cm: int,
+        agg: SoilAggMethod = SoilAggMethod.DOMINANT_COMPONENT,
+    ):
+        """Fetch data from SDA for the given AOI and parameters."""
+        self._debug("fetch_sda", "started")
+        sql = self._build_sda_sql(aoi_wkt, top_cm, bottom_cm, agg)
+        self._debug("fetch_sda", f"SQL built: {sql}")
+        result = self.sda_post_sql(sql, self.REST_URL)
+        self._debug("fetch_sda", f"SDA result: {result}")
+        self._debug("fetch_sda", "ended")
+        return result
 
 
 SOIL_PROPERTIES = {

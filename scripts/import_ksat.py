@@ -18,6 +18,124 @@ _ = gettext.gettext
 BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
 
 
+def download_ssurgo_data(area: str = "CONUS") -> str:
+    """
+    Download a gSSURGO ZIP from the Box folder metadata embedded in the project.
+
+    This function uses a mapping of area -> Box file id derived from the
+    `Box.postStreamData` structure. If the requested ZIP already exists in
+    `download_dir` it is returned immediately; otherwise the file is streamed
+    from Box and saved locally.
+
+    Source: https://nrcs.app.box.com/v/soils/folder/233398887779
+
+    Returns the local path to the downloaded ZIP file.
+    """
+    import requests
+
+    download_dir = os.path.join(os.getcwd(), "data")
+    os.makedirs(download_dir, exist_ok=True)
+
+    # Mapping derived from the Box.postStreamData items (id, name)
+    # (only a subset is required; add more entries as needed)
+    items = [
+        # Alphabetically ordered by filename
+        (2053597496877, "gSSURGO_AK.zip"),
+        (2053598296120, "gSSURGO_AL.zip"),
+        (2053599832603, "gSSURGO_AS.zip"),
+        (2053601334983, "gSSURGO_AZ.zip"),
+        (2053600468713, "gSSURGO_AR.zip"),
+        (2053602487091, "gSSURGO_CA.zip"),
+        (2063090987270, "gSSURGO_CONUS.zip"),
+        (2053604929910, "gSSURGO_CO.zip"),
+        (2053605443387, "gSSURGO_CT.zip"),
+        (2053607300532, "gSSURGO_DC.zip"),
+        (2053606504122, "gSSURGO_DE.zip"),
+        (2053602669083, "gSSURGO_FL.zip"),
+        (2053600120575, "gSSURGO_FM.zip"),
+        (2053605655113, "gSSURGO_GA.zip"),
+        (2053596685567, "gSSURGO_GU.zip"),
+        (2053603480430, "gSSURGO_HI.zip"),
+        (2053608515775, "gSSURGO_IA.zip"),
+        (2053611066183, "gSSURGO_ID.zip"),
+        (2053612778074, "gSSURGO_IL.zip"),
+        (2053607843504, "gSSURGO_IN.zip"),
+        (2053607264984, "gSSURGO_KS.zip"),
+        (2053616017663, "gSSURGO_KY.zip"),
+        (2053615953320, "gSSURGO_LA.zip"),
+        (2053614523038, "gSSURGO_MA.zip"),
+        (2053617378479, "gSSURGO_MD.zip"),
+        (2053610754514, "gSSURGO_ME.zip"),
+        (2053610265027, "gSSURGO_MH.zip"),
+        (2053618737116, "gSSURGO_MI.zip"),
+        (2100384657308, "gSSURGO_MN.zip"),
+        (2053616798033, "gSSURGO_MO.zip"),
+        (2053616936498, "gSSURGO_MP.zip"),
+        (2053613761292, "gSSURGO_MS.zip"),
+        (2053627247232, "gSSURGO_MT.zip"),
+        (2053622871681, "gSSURGO_NC.zip"),
+        (2053629906093, "gSSURGO_ND.zip"),
+        (2053620238847, "gSSURGO_NE.zip"),
+        (2053620908577, "gSSURGO_NH.zip"),
+        (2053620107548, "gSSURGO_NJ.zip"),
+        (2053626203227, "gSSURGO_NM.zip"),
+        (2053618432455, "gSSURGO_NV.zip"),
+        (2053621266777, "gSSURGO_NY.zip"),
+        (2053629582337, "gSSURGO_OH.zip"),
+        (2053622730158, "gSSURGO_OK.zip"),
+        (2053622163701, "gSSURGO_OR.zip"),
+        (2053624686739, "gSSURGO_PA.zip"),
+        (2053628409440, "gSSURGO_PRVI.zip"),
+        (2053622058265, "gSSURGO_PW.zip"),
+        (2053629422120, "gSSURGO_RI.zip"),
+        (2053631248086, "gSSURGO_SC.zip"),
+        (2053633074217, "gSSURGO_SD.zip"),
+        (2053627813329, "gSSURGO_TN.zip"),
+        (2053638615892, "gSSURGO_TX.zip"),
+        (2053625130559, "gSSURGO_UT.zip"),
+        (2053635916061, "gSSURGO_VA.zip"),
+        (2053624166245, "gSSURGO_VT.zip"),
+        (2053633667522, "gSSURGO_WA.zip"),
+        (2053636237428, "gSSURGO_WI.zip"),
+        (2053637617896, "gSSURGO_WV.zip"),
+        (2053636520809, "gSSURGO_WY.zip"),
+    ]
+
+    mapping = {name: str(fid) for fid, name in items}
+    # Also allow queries by state code (e.g., 'TX') or 'CONUS'
+    state_to_name = {name.split("_")[1].split(".")[0]: name for name in mapping.keys()}
+    mapping_by_state = {state: mapping[name] for state, name in state_to_name.items()}
+    mapping_by_state["CONUS"] = mapping.get("gSSURGO_CONUS.zip")
+
+    key = area.upper()
+    if key not in mapping_by_state:
+        available = sorted(mapping_by_state.keys())
+        raise ValueError(f"Area '{area}' not available. Available: {available}")
+
+    file_id = mapping_by_state[key]
+    filename = f"gSSURGO_{key}.zip"
+    local_path = os.path.join(download_dir, filename)
+
+    # If already downloaded, return it
+    if os.path.exists(local_path):
+        return local_path
+
+    # Construct Box download URL (Box export/download endpoint)
+    # This pattern works for the Box hosted files used by NRCS front-end.
+    download_url = f"https://nrcs.app.box.com/v/soils/file/{file_id}/download"
+
+    # Stream download
+    with requests.get(download_url, stream=True) as r:
+        if r.status_code != 200:
+            raise RuntimeError(f"Failed to download {filename}: HTTP {r.status_code}")
+        with open(local_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+    return local_path
+
+
 # Borrowed from scripts r.soildb module
 def region_to_crs_bbox(target_crs: str) -> [float]:
     """Convert GRASS region bounds to a bounding box in another CRS using m.proj."""
@@ -189,6 +307,8 @@ def main():
         for line in data:
             try:
                 project_name, projcrs, resolution, naip = line.split(":")
+                if project_name != "coweeta":
+                    continue
                 print(f"Project Name: {project_name}")
                 main_session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
                 tools = Tools(session=main_session, overwrite=True)
@@ -206,6 +326,7 @@ def main():
                 bbox_wtk = f"POLYGON(({region_bbox[0]} {region_bbox[1]}, {region_bbox[2]} {region_bbox[1]}, {region_bbox[2]} {region_bbox[3]}, {region_bbox[0]} {region_bbox[3]}, {region_bbox[0]} {region_bbox[1]}))"
                 print(f"Region BBOX: {bbox_wtk}")
                 data_path = "/vsizip/data/gSSURGO_NC.zip/gSSURGO_NC.gdb"
+                data_path = "/vsizip/data/gSSURGO_CONUS.zip/gSSURGO_CONUS.gdb"
                 crs_bbox = region_to_crs_bbox("EPSG:5070")
                 crs_bbox_wkt = f"POLYGON(({crs_bbox[0]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[1]}, {crs_bbox[2]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[3]}, {crs_bbox[0]} {crs_bbox[1]}))"
                 print(f"CRS BBOX: {crs_bbox}")
@@ -220,8 +341,6 @@ def main():
                     print(f"Session info: {session_env}")
                     if output:
                         print("Checking data was imported correctly...")
-                        new_vect = mtools.g_list(type="vector", format="json").json
-                        print(f"{new_vect=}")
                         update_hydrologic_group(mtools, output)
                         cols = mtools.v_info(map=output, format="json", flags="c").json
                         print(f"{cols=}")
@@ -325,59 +444,12 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
     top = 0
     bottom = 100  # depth range in cm (0–100 cm) for ksat thickness calculation
 
-    # Query to fetch ksat data
-    # query = f"""
-    # WITH mu AS (
-    #     SELECT mukey, shape AS geom
-    #     FROM ST_Read('{db_path}', layer='MUPOLYGON', spatial_filter=ST_AsWKB(ST_GeomFromText(?)))
-    # )
-    # SELECT mu.geom,
-    #        c.mukey,
-    #        c.cokey,
-    #        c.compname,
-    #        c.comppct_r,
-    #        c.runoff,
-    #        c.hydgrp,
-    #        c.hydricon,
-    #        c.hydricrating,
-    #        c.drainagecl,
-    #        ROW_NUMBER() OVER (PARTITION BY c.mukey ORDER BY c.comppct_r DESC) AS rn
-    # FROM ST_Read('{db_path}', layer='component') AS c
-    # INNER JOIN mu ON mu.mukey = c.mukey
-    # WHERE c.comppct_r IS NOT NULL
-    # """
-
-    # Table mu polygon fields used:
-    # mukey: Map unit key
-    # shape: Geometry field
-
-    # Table component fields used:
-    # mukey: Map unit key
-    # cokey: Component key
-    # comppct_r: Component percentage of map unit
-    # compname: Component name
-    # runoff: Runoff curve number
-    # hydgrp: Hydrologic soil group
-    # hydricon: Hydric condition
-    # hydricrating: Hydric rating
-    # drainagecl: Drainage class
-
-    # Table chorizon fields used:
-    # hzdept_r: Horizon depth top (cm)
-    # hzdepb_r: Horizon depth bottom (cm)
-    # ksat_r: (representative) (micrometers per second)
-    #    The amount of water that would move vertically
-    #    through a unit area of saturated soil in unit
-    #    time under unit hydraulic gradient.
-    # ksat_h: (high) (micrometers per second)
-    # ksat_l: (low) (micrometers per second)
-    # desgnmaster: Designation of master horizon
     MICROMETERS_PER_SECOND_TO_MM_PER_HOUR = 3.6  # Conversion factor
     # Build query that returns one row per mukey (dominant component + ksat)
     query = f"""
     WITH mu AS (
         SELECT mukey, shape AS geom
-        FROM ST_Read('{db_path}', layer='MUPOLYGON', spatial_filter_box=ST_EXTENT(ST_AsWKB(ST_GeomFromText(?)))::BOX_2D)
+        FROM ST_Read('{db_path}', layer='MUPOLYGON', spatial_filter_box=ST_EXTENT(ST_AsWKB(ST_GeomFromText(?))))
     ),
     -- choose dominant component per mukey (deterministic tiebreaker on cokey)
     dom_comp AS (
@@ -484,7 +556,8 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
 
     gs.create_project(path=tempdir.name, name=temp_project, epsg=5070, overwrite=True)
     temp_session = gj.init(Path(tempdir.name, temp_project))
-    output_layer = f"{project_name}_mupolygon"
+    safe_layername = project_name.replace("-", "_").replace(" ", "_")
+    output_layer = f"{safe_layername}_mupolygon"
 
     fd, tmp_filepath = tempfile.mkstemp(suffix=".fgb")
 
@@ -498,7 +571,10 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
         (FORMAT GDAL, DRIVER 'FlatGeobuf', SRS 'EPSG:5070');
         """
 
-        con.execute(export_sql, [bbox_wkt])
+        con.execute(
+            export_sql,
+            [bbox_wkt],
+        )
 
         # Create a new GRASS session for the temp dataset
         with Tools(session=temp_session) as t:
@@ -507,7 +583,11 @@ def ksat_import(db_path, project_name, bbox_wkt, resolution, tools):
             session_env = t.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep="/").text
             print(f"Temp Session info: {session_env}")
             t.v_in_ogr(
-                input=tmp_filepath, output=output_layer, type="boundary", snap=0.0001
+                input=tmp_filepath,
+                output=output_layer,
+                type="boundary",
+                snap=1e-6,
+                flags="",
             )
 
             new_vect = t.g_list(type="vector", format="json").json

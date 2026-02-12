@@ -1,0 +1,167 @@
+---
+jupyter: python3
+author: Corey T. White
+execute:
+  eval: true
+  freeze: auto
+date-modified: today
+format:
+  html:
+    toc: true
+    code-tools: true
+    code-copy: true
+    code-fold: false
+---
+
+# SSURGO Soil Data in GRASS
+
+```{python}
+# | echo: false
+import os
+import subprocess
+import sys
+
+# import numpy as np
+import matplotlib.pyplot as plt
+from pprint import pprint
+from PIL import Image
+import pandas as pd
+import sqlite3
+from IPython.display import IFrame
+import numpy as np
+import seaborn as sns
+import pandas as pd
+
+# Ask GRASS GIS where its Python packages are.
+sys.path.append(
+    subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
+)
+
+# Import the GRASS GIS packages we need.
+import grass.script as gs
+
+# Import GRASS Jupyter
+import grass.jupyter as gj
+from grass.tools import Tools
+```
+
+```{python}
+gisdb = os.path.join(os.getenv("HOME"), "grassdata")
+site = "clay-center"
+mapset = "ssurgo_demo"
+session = gj.init(gisdb, site, "PERMANENT")
+tools = Tools(session=session)
+# tools.g_mapset(mapset=mapset, flags="c")
+```
+
+Install addon
+
+```{python}
+# | eval: false
+tools.g_extension(
+    extension="r.in.ssurgo",
+    url="../tools/r.soildb/r.in.ssurgo",
+)
+```
+
+```{python}
+region_text = tools.g_region(raster="elevation", flags="p").text
+tools.r_relief(input="elevation", output="relief")
+
+print(region_text)
+```
+
+```{python}
+# | eval: false
+tools.r_in_ssurgo(
+    ssurgo_path="../data/gSSURGO_CONUS.zip/gSSURGO_CONUS.gdb",
+    ssurgo_areas="soil_areas",
+    hydgrp="hydgrp",
+    ksat_l="ksat_l",
+    ksat_r="ksat_r",
+    ksat_h="ksat_h",
+    mukey="mukey",
+    hzdept_r=0,
+    hzdepb_r=100,
+    desgnmaster="A",
+    overwrite=True,
+)
+```
+
+```{python}
+tools.g_list(type="vector", mapset=mapset)
+```
+
+```{python}
+json_data = tools.v_db_select(map="clay_center_mupolygon", format="json").json
+
+df = pd.DataFrame(json_data["records"])
+
+df.head()
+```
+
+## Ksat Maps
+
+### Regular
+```{python}
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="ksat_r")
+m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="b")
+m.show()
+```
+
+### High
+```{python}
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="ksat_h")
+m.show()
+```
+
+### Low
+```{python}
+m = gj.Map(use_region=True)
+m.d_rast(map="ksat_l")
+m.d_shade(shade="relief", color="ksat_l")
+m.show()
+```
+
+## Hydrologic Group
+
+```{python}
+m = gj.Map(use_region=True)
+m.d_rast(map="hsg")
+m.d_shade(shade="relief", color="hsg")
+m.d_legend(raster="hsg", title="Hd", flags="b")
+m.show()
+```
+
+```{python}
+tools.g_list(type="raster", mapset="PERMANENT")
+```
+
+
+## Run model
+
+```{python}
+# | eval: true
+tools.r_slope_aspect(elevation="elevation", dx="dx", dy="dy")
+
+
+tools.r_sim_water(
+    elevation="elevation", depth="depth", discharge="discharge"
+)
+```
+
+
+```{python}
+m = gj.Map(use_region=True)
+m.d_rast(map="depth")
+m.d_shade(shade="relief", color="depth")
+m.show()
+```
+
+```{python}
+m = gj.Map(use_region=True)
+m.d_rast(map="discharge")
+m.show()
+```
