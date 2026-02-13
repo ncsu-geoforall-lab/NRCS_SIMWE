@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(r.soilsdb)
+project(r.soildb)
 
 include(build_addon)
 
@@ -8,6 +8,7 @@ build_addon(
   ${PROJECT_NAME}
   ADDONS
     r.in.ssurgo
+    libsoil
   DOCFILES
-    r.in.ssurgo.html
-    r.in.ssurgo.md)
+    r.soildb.html
+    r.soildb.md)

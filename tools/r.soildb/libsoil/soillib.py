@@ -131,7 +131,7 @@ def region_to_wkt_wgs84():
     return wkt
 
 
-def region_to_crs_bbox(target_crs: str) -> [float]:
+def region_to_crs_bbox(target_crs: str) -> list[float]:
     """Convert GRASS region bounds to a bounding box in another CRS using m.proj."""
     region = gs.region()
     # Extract corner coordinates

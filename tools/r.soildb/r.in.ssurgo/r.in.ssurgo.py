@@ -113,7 +113,6 @@ import tempfile
 
 from requests import options
 import grass.script as gs
-import grass.jupyter as gj
 from grass.exceptions import CalledModuleError
 from grass.tools import Tools
 from grass.pygrass.utils import get_lib_path
@@ -126,6 +125,8 @@ _ = gettext.gettext
 
 # Active GRASS session tools
 tools = Tools()
+SESSION = tools.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep="/").text
+gs.message(f"Active GRASS session: {SESSION}")
 
 
 def _import_duckdb(error):
@@ -169,7 +170,7 @@ def add_sys_path(new_path: str):
         sys.path = original_sys_path
 
 
-def region_to_crs_bbox(target_crs: str) -> [float]:
+def region_to_crs_bbox(target_crs: str) -> list[float]:
     """Convert GRASS region bounds to a bounding box in another CRS using m.proj."""
     region = gs.region()
     # Extract corner coordinates
@@ -315,7 +316,7 @@ def ksat_color_scheme(map_name: str) -> None:
     tools.r_colors(map=map_name, rules=StringIO(ksat_color_scheme), flags="")
 
 
-def update_hydrologic_group(vector_map, source_col="hydgrp", target_col="hsg"):
+def update_hydrologic_group(tools, vector_map, source_col="hydgrp", target_col="hsg"):
     """
     Ensure an integer Hydrologic Soil Group (HSG) column exists on the vector and populate it from source_col.
     Mapping:
@@ -512,6 +513,7 @@ def local_ssurgo_query(
     SELECT
         d.geom,
         d.mukey,
+        CAST(d.mukey AS INTEGER) AS mukey_int,
         d.cokey,
         d.compname,
         d.comppct_r,
@@ -531,18 +533,13 @@ def local_ssurgo_query(
         gs.warning(_("No records found in your region."))
         return None
 
-    # Export to GRASS using GDAL/OGR_GRASS driver
-    tempdir = tempfile.TemporaryDirectory()
-    temp_project = "tmp_r_ssurgo_5070"
-
-    gs.create_project(path=tempdir.name, name=temp_project, epsg=5070, overwrite=True)
-    temp_session = gj.init(Path(tempdir.name, temp_project))
-    output_layer = ssurgo_areas_out
-    fd, tmp_filepath = tempfile.mkstemp(suffix=".fgb")
-
-    # GRASS GDAL driver isn't supported by duckdb
-    print(f"Tempfile Path: {tmp_filepath}")
     try:
+        output_layer = ssurgo_areas_out
+        fd, tmp_filepath = tempfile.mkstemp(suffix=".fgb")
+
+        # GRASS GDAL driver isn't supported by duckdb
+        gs.message(f"Tempfile Path: {tmp_filepath}")
+
         export_sql = f"""
         COPY (
             {query.strip()}
@@ -555,70 +552,119 @@ def local_ssurgo_query(
             [wkt_bbox],
         )
 
-        # Create a new GRASS session for the temp dataset
-        with Tools(session=temp_session) as t:
-            print("#" * 50)
-            print("Starting temp GRASS session for SSURGO import...")
-            session_env = t.g_gisenv(get="GISDBASE,LOCATION_NAME,MAPSET", sep="/").text
-            print(f"Temp Session info: {session_env}")
-            t.v_in_ogr(
-                input=tmp_filepath,
-                output=output_layer,
-                type="boundary",
-                snap=1e-6,
-                flags="",
-            )
+        # Export to GRASS using GDAL/OGR_GRASS driver
+        tempdir = tempfile.TemporaryDirectory()
 
-            new_vect = t.g_list(type="vector", format="json").json
-            print(f"Temp Session Vectors: {new_vect}")
+        gs.create_project(path=tempdir.name, epsg=5070, overwrite=True)
+        with gs.setup.init(Path(tempdir.name)) as temp_session:
+            # Create a new GRASS session for the temp dataset
+            with Tools(session=temp_session) as t:
+                gs.message("#" * 50)
+                gs.message("Starting temp GRASS session for SSURGO import...")
+                session_env = t.g_gisenv(
+                    get="GISDBASE,LOCATION_NAME,MAPSET", sep="/"
+                ).text
+                gs.message(f"Temp Session info: {session_env}")
+                t.v_in_ogr(
+                    input=tmp_filepath,
+                    output=output_layer,
+                    type="boundary",
+                    snap=1e-6,
+                    flags="",
+                )
 
-        # Reproject dataset from temp project to the current GRASS project
-        # new_session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
-        # with Tools(session=new_session, overwrite=True) as mtools:
-        print("#" * 50)
-        session_env = wkt_bbox.g_gisenv(
-            get="GISDBASE,LOCATION_NAME,MAPSET", sep="/"
-        ).text
-        print(f"Return to last session: {session_env}")
-        print("Reprojecting ssurgo data...")
+                new_vect = t.g_list(type="vector", format="json").json
+                gs.message(f"Temp Session Vectors: {new_vect}")
 
-        tools.v_proj(
-            project=temp_project,
-            input=output_layer,
-            dbase=tempdir.name,
-            mapset="PERMANENT",
-            output=output_layer,
-            verbose=True,
-        )
+            # Reproject dataset from temp project to the current GRASS project
+            # new_session = gj.init(f"{gisdb}/{project_name}/PERMANENT")
+            # with Tools(session=new_session, overwrite=True) as mtools:
+            gs.message("#" * 50)
+            tmp_project_name = Path(tempdir.name).name
+            gs.message(f"Project Name: {tmp_project_name}")
+            tmp_dbpath = Path(tempdir.name).parent
+            gs.message(f"Temp DB Path: {tmp_dbpath}")
+
+        with gs.setup.init(Path(SESSION)) as session:
+            gs.message(f"Original Session info: {session}")
+            with Tools(session=session) as tools:
+                gs.message("Reprojecting ssurgo data...")
+                gs.message(f"Temp Dir {tempdir}")
+                gs.message(f"Temp Dir {tempdir.name}")
+
+                tools.v_proj(
+                    project=tmp_project_name,
+                    input=output_layer,
+                    dbase=tmp_dbpath,
+                    mapset="PERMANENT",
+                    output=output_layer,
+                    verbose=False,
+                )
 
     except CalledModuleError as e:
-        print(f"Import failed: {e}")
+        gs.message(f"Import failed: {e}")
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        gs.message(f"An error occurred: {e}")
 
     finally:
-        print("cleaning up temp project")
+        gs.message("cleaning up temp project")
         tempdir.cleanup()
-        print(f"Tempfile Name: {tmp_filepath=}")
+        gs.message(f"Tempfile Name: {tmp_filepath=}")
         os.close(fd)
         os.remove(tmp_filepath)
-        print("cleaned up temp FlatGeoBuff")
+        gs.message("cleaned up temp FlatGeoBuff")
 
     return output_layer
 
 
 def main():
-    # Import dependencies
-    path = get_lib_path(modname="r.soildb", libname="soillib")
+    # Import dependencies (library directory is `libsoil`)
+    path = get_lib_path(modname="r.soildb", libname="libsoil")
     if path is None:
         gs.fatal("Not able to find the soillib library directory.")
 
-    with add_sys_path(path):
-        try:
-            import soillib as libsoil
-        except ImportError as err:
-            gs.fatal(f"Unable to import staclib: {err}")
+    # Debug: report resolved path and contents to help diagnose import issues
+    gs.message(f"Resolved libsoil path: {path}")
+    try:
+        dir_listing = os.listdir(path)
+        gs.message(f"Contents of libsoil path: {dir_listing}")
+    except Exception as _err:
+        gs.message(f"Could not list libsoil path contents: {_err}")
+
+    # Try to directly load soillib.py from the resolved path to avoid import ambiguity
+    soillib_file = os.path.join(path, "soillib.py")
+    gs.message(f"Attempting to load soillib from file: {soillib_file}")
+    libsoil = None
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("libsoil.soillib", soillib_file)
+        libsoil = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(libsoil)
+        gs.message(
+            f"Loaded soillib module via importlib from: {getattr(libsoil, '__file__', '<unknown>')}"
+        )
+    except Exception as e:
+        gs.message(f"Direct importlib load failed: {e}; falling back to package import")
+        with add_sys_path(path):
+            try:
+                import soillib as libsoil
+
+                gs.message(
+                    f"Imported soillib via normal import from: {getattr(libsoil, '__file__', '<unknown>')}"
+                )
+            except ImportError as err:
+                gs.fatal(f"Unable to import soillib: {err}")
+
+    # Validate expected API
+    if libsoil is None or not hasattr(libsoil, "check_if_zipfile"):
+        available = (
+            [a for a in dir(libsoil) if not a.startswith("__")] if libsoil else []
+        )
+        gs.fatal(
+            f"soillib module does not expose expected function 'check_if_zipfile'. Available: {available}"
+        )
 
     # Inputs
     ssurgo_path = Path(options["ssurgo_path"])
@@ -667,7 +713,7 @@ def main():
             else:
                 gs.message("Importing SSURGO data from local file.")
                 _ssurgo_path = check_if_zipfile(ssurgo_path)
-                wkt_bbox = region_to_crs_wkt(target_crs="EPSG:5070")
+                wkt_bbox = libsoil.region_to_crs_wkt(target_crs="EPSG:5070")
                 con = connect_duckdb(threads=nprocs)
                 ssurgo_areas = local_ssurgo_query(
                     con=con,
@@ -683,32 +729,40 @@ def main():
                     mukey_out=mukey,
                     ssurgo_areas_out=ssurgo_areas,
                 )
-                update_hydrologic_group(tools, ssurgo_areas)
-                _output_maps = [
-                    ("hydgrp", hydgrp),
-                    ("ksat_h", ksat_h),
-                    ("ksat_r", ksat_r),
-                    ("ksat_l", ksat_l),
-                    ("mukey", mukey),
-                ]
-                for col, map_name in _output_maps:
-                    if map_name is None:
-                        continue
+                with gs.setup.init(Path(SESSION)) as session:
+                    with Tools(session=session) as tools:
+                        update_hydrologic_group(tools, ssurgo_areas)
+                        # Column, map name, label column (for categorical)
+                        _output_maps = [
+                            ("hsg", hydgrp, "hydgrp"),
+                            ("ksat_h", ksat_h, None),
+                            ("ksat_r", ksat_r, None),
+                            ("ksat_l", ksat_l, None),
+                            ("mukey_int", mukey, None),
+                        ]
+                        for col, map_name, label_column in _output_maps:
+                            if map_name is None:
+                                continue
 
-                    tools.v_to_rast(
-                        input=map_name,
-                        type="area",
-                        use="attr",
-                        attribute_column=col,
-                        output=map_name,
-                    )
+                            tools.v_to_rast(
+                                input=ssurgo_areas,
+                                type="area",
+                                use="attr",
+                                attribute_column=col,
+                                output=map_name,
+                                label_column=label_column if label_column else "",
+                            )
 
-                    ksat_cols = ["ksat_l", "ksat_r", "ksat_h"]
-                    if col in ksat_cols:
-                        ksat_color_scheme(map_name)
+                            ksat_cols = ["ksat_l", "ksat_r", "ksat_h"]
+                            if col in ksat_cols:
+                                ksat_color_scheme(map_name)
 
-                    if col == "hsg":
-                        hydrologic_soil_group_color_scheme(map_name)
+                            if col == "mukey_int":
+                                # Apply categorical color scheme to mukey raster
+                                tools.r_colors(map=map_name, color="random")
+
+                            if col == "hsg":
+                                hydrologic_soil_group_color_scheme(map_name)
         finally:
             if os.path.exists(tif_path):
                 os.remove(tif_path)
