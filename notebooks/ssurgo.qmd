@@ -48,6 +48,7 @@ from grass.tools import Tools
 
 ```{python}
 # | label: init_session
+# | echo: false
 gisdb = os.path.join(os.getenv("HOME"), "grassdata")
 site = "coweeta"
 mapset = "ssurgo_demo"
@@ -64,25 +65,53 @@ Install the `r.in.ssurgo` extension if it is not already installed. This extensi
 ```{python}
 # | label: install_extension
 # | eval: false
+# | echo: false
+
 tools.g_extension(
     extension="r.in.ssurgo",
-    url="../tools/r.soildb/r.in.ssurgo",
+    url="../../../cwhite911/grass-addons/src/raster/r.in.ssurgo"
+)
+
+```
+
+::: {.panel-tabset}
+
+## Command Line
+
+```sh
+g.extension r.in.ssurgo
+```
+
+## Python (grass.tools)
+
+```python
+tools.g_extension(
+    extension="r.in.ssurgo"
 )
 ```
+:::
 
 Set the computational region to the elevation raster and create a relief raster for hillshading.
 
 ```{python}
 # | label: set_region
 region_text = tools.g_region(raster="elevation", flags="p").text
-tools.r_relief(input="elevation", output="relief")
 print(region_text)
+```
+
+Let's also create a relief raster for hillshading or soil maps.
+
+```{python}
+tools.r_relief(input="elevation", output="relief")
 ```
 
 Import SSURGO data using `r.in.ssurgo`. Note that this will import the soil areas map, hydrologic group map, and ksat maps for low, regular, and high values. The `mukey` column is also imported as a raster with a categorical color scheme applied. The hydrologic group map also has a categorical color scheme applied.
 
+::: {.panel-tabset}
+
+## Local Import
 ```{python}
-# | label: import_ssurgo
+# | label: import_ssurgo_local
 # | eval: false
 tools.r_in_ssurgo(
     ssurgo_path="../data/gSSURGO_CONUS.zip/gSSURGO_CONUS.gdb",
@@ -93,10 +122,34 @@ tools.r_in_ssurgo(
     ksat_h="ksat_h",
     mukey="mukey",
     hzdept_r=0,
-    hzdepb_r=100,
+    hzdepb_r=25,
     desgnmaster="A",
+    nprocs=30
 )
 ```
+
+
+## SDA Import
+```{python}
+# | label: import_ssurgo_sda
+# | eval: false
+tools.r_in_ssurgo(
+    ssurgo_areas="soil_areas_sda",
+    hydgrp="hydgrp_sda",
+    ksat_l="ksat_l_sda",
+    ksat_r="ksat_r_sda",
+    ksat_h="ksat_h_sda",
+    mukey="mukey_sda",
+    hzdept_r=0,
+    hzdepb_r=25,
+    desgnmaster="A",
+    nprocs=30,
+    flags="d",
+)
+```
+
+:::
+
 
 ```{python}
 # | label: vector_maps
@@ -105,7 +158,7 @@ print(tools.g_list(type="vector", mapset=mapset).text)
 
 ```{python}
 # | label: soil attributes
-json_data = tools.v_db_select(map="soil_areas", format="json").json
+json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
 df = pd.DataFrame(json_data["records"])
 df.head()
 ```
@@ -135,6 +188,9 @@ m.show()
 # |     - Low
 # |     - Regular
 # |     - High
+# |     - Low - SDA
+# |     - Regular - SDA
+# |     - High - SDA
 
 
 m = gj.Map(use_region=True)
@@ -151,16 +207,50 @@ m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_h")
 m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="b")
 m.show()
+
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="ksat_l_sda")
+m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="b")
+m.show()
+
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="ksat_r_sda")
+m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="b")
+m.show()
+
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="ksat_h_sda")
+m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="b")
+m.show()
 ```
 
 ## Hydrologic Group
 
 ```{python}
 # | label: hydrologic_group_map
+# | layout-ncol: 2
+
 m = gj.Map(use_region=True)
-m.d_rast(map="hsg")
-m.d_shade(shade="relief", color="hsg")
-m.d_legend(raster="hsg", title="Group", flags="b")
+m.d_shade(shade="relief", color="hydgrp")
+m.d_legend(raster="hydgrp", title="Group", flags="bn")
+m.show()
+
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="hydgrp_sda")
+m.d_legend(raster="hydgrp_sda", title="Group", flags="bn")
+m.show()
+```
+
+Let's compare the hydrologic group maps to make sure they are the same. We can use `r.mapcalc` to create a new raster that is the difference between the two maps. If the maps are the same, then the difference should be all zeros.
+
+```{python}
+tools.r_mapcalc(
+    expression="hydgrp_diff = hsg - hydgrp_sda",
+)
+
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="hydgrp_diff")
+m.d_legend(raster="hydgrp_diff", title="Difference", flags="b")
 m.show()
 ```
 
