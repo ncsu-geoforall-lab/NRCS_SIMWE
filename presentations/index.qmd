@@ -8,5 +8,5 @@ listing:
     type: grid
     contents:
      - "./agu2024/agu_2024.qmd"
-     - "iale2025"
+     - "./iale2025/abstract.qmd"
 ---

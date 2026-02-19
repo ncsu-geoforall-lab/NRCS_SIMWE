@@ -3,7 +3,7 @@ title: Topographic Impacts of Hurricane Helene
 subtitle: in Western North Carolina
 date: April 16, 2025
 date-modified: 05/05/2025
-image: images/img0.png
+# image: images/img0.png
 doi: 10.5281/ZENODO.15237651
 author:
   - name: "Corey T. White"
@@ -50,11 +50,8 @@ format:
     slide-number: c/t
     width: 1600
     height: 900
-    # logo:
     title-slide-attributes:
-      data-background-image:  images/img0.png
-      # data-background-size: fill
-    # footer: "Organization"
+      data-background-image: images/img0.png
     incremental: true
     theme: [../../grass.scss]
 draft: true

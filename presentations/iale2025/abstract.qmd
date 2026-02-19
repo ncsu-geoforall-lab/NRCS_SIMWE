@@ -47,6 +47,13 @@ affiliations:
     name: U.S. Amry Corps of Engineers, Engineer Research and Development Center (ERDC)
 ---
 
+## Slides
+
+::: {.callout-note}
+View the presentation: [Topographic Impacts of Hurricane Helene](https://docs.google.com/presentation/d/1CrRC2gHSKg4Mx9BllyT0qfrI3B3rFcgqHLMmfqwWzV4/edit?slide=id.p#slide=id.p)
+:::
+
+
 ## Abstract
 
 Hurricane Helene caused record flooding, resulting in significant topographic disturbances across Western North Carolina. While aerial imagery is critical in immediate relief efforts, 3D topographic products provide emergency managers with actionable insights by identifying the location, extent, and volume of damages, sediment, and other flood debris requiring prioritized resource allocation. However, generating post-storm digital elevation models (DEMs) poses challenges. Heavy cloud cover limited the use of satellite imagery, while LiDAR—despite its high accuracy—is challenging to deploy rapidly in post-storm scenarios. To overcome these limitations, post-storm aerial imagery collected by the Civil Air Patrol (CAP) provided crucial early data for understanding the full range of topographic disturbances. We employed structure-from-motion (SfM) to process 69,247 CAP aerial images (~1.41 TB) into digital surface models (DSM). Data fusion was applied to generate post-storm digital terrain models (DTM) by fusing post-storm SfM-based DSM with pre-storm LiDAR-based DTM. The resulting post-storm DEMs were compared to 2018 LiDAR-based DEMs to estimate spatially explicit topographic changes across an area of ~54,000 km². This process revealed several key challenges for rapid post-storm DEM generation, including collecting, storing, and processing large volumes of raw image data. Addressing these challenges is critical for improving workflows and enabling faster deployment of topographic data products for disaster response and recovery.
