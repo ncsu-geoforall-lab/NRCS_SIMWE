@@ -162,7 +162,7 @@ print(tools.g_list(type="vector", mapset=mapset).text)
 # | label: SDA soil attributes
 json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
 df = pd.DataFrame(json_data["records"])
-df.head()
+df.info()
 ```
 
 ```{python}
@@ -170,7 +170,7 @@ df.head()
 
 json_data = tools.v_db_select(map="soil_areas", format="json").json
 df = pd.DataFrame(json_data["records"])
-df.head()
+df.info()
 ```
 
 ```{python}
@@ -190,7 +190,7 @@ m.show()
 # | label: mukey
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="mukey_sda")
-# m.d_vect(map="soil_areas_sda", color="white", fillcolor="none", width=0.5)
+m.d_vect(map="soil_areas_sda", color="black", fillcolor="none", width=0.5)
 # m.d_legend(raster="mukey", title="MUKEY", flags="b")
 m.show()
 ```
@@ -213,32 +213,32 @@ m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_l")
-m.d_legend(raster="ksat_l", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_l", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_r")
-m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_h")
-m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_l_sda")
-m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_r_sda")
-m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_h_sda")
-m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="b")
+m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 ```
 
@@ -248,15 +248,17 @@ m.show()
 # | label: hydrologic_group_map
 # | layout-ncol: 2
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="hydgrp")
-m.d_legend(raster="hydgrp", title="Group", flags="bn")
-m.show()
+with gs.RegionManager(raster="hydgrp", s="s-50000", flags="a"):
+    tools.g_region(raster="hydgrp_sda", flags="p")
+    m = gj.Map(use_region=False)
+    m.d_shade(shade="relief", color="hydgrp")
+    m.d_legend(raster="hydgrp", flags="bn", at="0, 30, 1, 30")
+    m.show()
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="hydgrp_sda")
-m.d_legend(raster="hydgrp_sda", title="Group", flags="bn")
-m.show()
+    m = gj.Map(use_region=False)
+    m.d_shade(shade="relief", color="hydgrp_sda")
+    m.d_legend(raster="hydgrp_sda", flags="bn")
+    m.show()
 ```
 
 Let's compare the hydrologic group maps to make sure they are the same. We can use `r.mapcalc` to create a new raster that is the difference between the two maps. If the maps are the same, then the difference should be all zeros.
