@@ -2,7 +2,7 @@
 jupyter: python3
 author: Corey T. White
 execute:
-  eval: true
+  eval: false
   freeze: auto
 date-modified: today
 format:
@@ -218,7 +218,7 @@ The tool imports the soil polygons as a vector map (`soil_areas_sda`), which con
 # | label: SDA soil attributes
 # | echo: false
 
-json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
+json_data = tools.v_db_select(map="soils_polygons", format="json").json
 df = pd.DataFrame(json_data["records"])
 display(df.head())
 ```
@@ -244,6 +244,13 @@ m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="mukey_sda")
 m.d_vect(map="soil_areas_sda", color="black", fillcolor="none", width=0.5)
 # m.d_legend(raster="mukey", title="MUKEY", flags="b")
+m.show()
+```
+
+```{python}
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="mukey")
+m.d_vect(map="soils_polygons", color="black", fillcolor="white", width=0.5)
 m.show()
 ```
 
