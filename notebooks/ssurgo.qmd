@@ -11,9 +11,69 @@ format:
     code-tools: true
     code-copy: true
     code-fold: false
+    mermaid:
+      theme: forest
 ---
 
-# SSURGO Soil Data in GRASS
+# [WIP] SSURGO Soil Data in GRASS
+
+This notebook demonstrates how to import SSURGO soil data into GRASS using the `r.in.ssurgo` extension. The `r.in.ssurgo` tool can import both local SSURGO data and data from the Soil Data Access (SDA) web service. The imported data includes *soil areas*, *hydrologic groups*, *ksat maps*, and *mukey maps*, which can be used for hydrological modeling and analysis in GRASS.
+
+The flowchart below (@fig_ssurgo_flowchart) illustrates the workflow for using SSURGO data in GRASS, including the tools and outputs that can be generated from the imported soil data. We will cover the following steps in this notebook:
+
+```{mermaid}
+%% label: fig_ssurgo_flowchart
+%% echo: false
+%% fig-cap: "(Draft) Flowchart of SSURGO SIMWE workflows"
+flowchart TD
+    A[r.in.ssurgo] --> B("Soils map vector")
+    A[r.in.ssurgo] --> HG("Hydrologic group map")
+    A[r.in.ssurgo] --> KSAT("Ksat maps rasters")
+    A[r.in.ssurgo] --> E("MUKEY map raster")
+    B --> F("Soil attributes in vector attribute table")
+    G[r.curvenumber] --> H("Curve number map")
+    HG --> G
+    LC(NLCD land cover map) --> G
+    ELEV[Elevation raster] --> W[r.watershed]
+    W --> I("Flow direction")
+    W --> J("Streams")
+    W --> K("Basins")
+    TC[r.timeofconcentration] --> TCR("Time of concentration")
+    ELEV --> TC
+    I --> TC
+    J --> TC
+    H --> R[r.runoff]
+    I --> R
+    TCR --> R
+    R --> RD("Runoff depth")
+    R --> RV("Runoff volume")
+    R --> TP("Time to peak")
+    R --> PD("Peak discharge raster")
+    R --> URD("Upstream runoff depth")
+    R --> URV("Upstream runoff volume")
+    R --> UA("Upstream area")
+    LC --> MC["r.manning"]
+    MC --> MN("Manning's n map")
+    ELEV --> RSA["r.slope.aspect"]
+    RSA --> DX("dx")
+    RSA --> DY("dy")
+    ELEV --> SIMWE["r.sim.water"]
+    DX --> SIMWE
+    DY --> SIMWE
+    MN --> SIMWE
+    HG --> SIMWE
+    KSAT --> SIMWE
+    SIMWE --> DEPTH("Water depth raster")
+    SIMWE --> DISCHARGE("Discharge raster")
+```
+
+## Objectives
+
+1. Import SSURGO soil data into GRASS using `r.in.ssurgo`.
+2. Visualize the imported soil maps, including soil areas, hydrologic groups, ksat maps, and mukey maps.
+3. Calculate curve number using the imported hydrologic group map and a land cover map.
+4. Calculate runoff depth and peak discharge using the curve number map, flow direction, and time of concentration.
+5. Run a basic SIMWE simulation using the imported soil data and visualize the results.
 
 ```{python}
 # | label: imports
@@ -49,6 +109,7 @@ from grass.tools import Tools
 ```{python}
 # | label: init_session
 # | echo: false
+# | output: false
 gisdb = os.path.join(os.getenv("HOME"), "grassdata")
 site = "coweeta"
 mapset = "ssurgo_demo"
@@ -159,15 +220,24 @@ print(tools.g_list(type="vector", mapset=mapset).text)
 ```
 
 ```{python}
-# | label: SDA soil attributes
+# | label: SDA soil attributes info
+# | echo: false
 json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
 df = pd.DataFrame(json_data["records"])
 df.info()
 ```
 
 ```{python}
-# | label: local soil attributes
+# | label: SDA soil attributes
+# | echo: false
+json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
+df = pd.DataFrame(json_data["records"])
+df.head()
+```
 
+```{python}
+# | label: local soil attributes
+# | echo: false
 json_data = tools.v_db_select(map="soil_areas", format="json").json
 df = pd.DataFrame(json_data["records"])
 df.info()
@@ -181,11 +251,12 @@ print(tools.g_list(type="raster", mapset=mapset).text)
 ## MUKEY Map
 ```{python}
 # | label: mukey
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="mukey")
-m.d_vect(map="soil_areas", color="black", fillcolor="none", width=0.5)
-# m.d_legend(raster="mukey", title="MUKEY", flags="b")
-m.show()
+# | echo: false
+# m = gj.Map(use_region=True)
+# m.d_shade(shade="relief", color="mukey")
+# m.d_vect(map="soil_areas", color="black", fillcolor="none", width=0.5)
+# # m.d_legend(raster="mukey", title="MUKEY", flags="b")
+# m.show()
 
 # | label: mukey
 m = gj.Map(use_region=True)
@@ -201,6 +272,7 @@ m.show()
 ```{python}
 # | label: ksat
 # | layout-ncol: 3
+# | echo: false
 # | fig-cap: "Ksat maps for low, regular, and high values"
 # | fig-subcap:
 # |     - Low
@@ -211,20 +283,20 @@ m.show()
 # |     - High - SDA
 
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_l")
-m.d_legend(raster="ksat_l", title="Ksat (mm/hr)", flags="db")
-m.show()
+# m = gj.Map(use_region=True)
+# m.d_shade(shade="relief", color="ksat_l")
+# m.d_legend(raster="ksat_l", title="Ksat (mm/hr)", flags="db")
+# m.show()
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_r")
-m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="db")
-m.show()
+# m = gj.Map(use_region=True)
+# m.d_shade(shade="relief", color="ksat_r")
+# m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="db")
+# m.show()
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_h")
-m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="db")
-m.show()
+# m = gj.Map(use_region=True)
+# m.d_shade(shade="relief", color="ksat_h")
+# m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="db")
+# m.show()
 
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="ksat_l_sda")
@@ -244,9 +316,13 @@ m.show()
 
 ## Hydrologic Group
 
+We can visualize the hydrologic group maps to compare the local and SDA imports. The hydrologic group map is a categorical raster with values of A, B, C, D, and A/D. The color scheme is applied using `r.colors` with the `hydgrp` color table.
+
 ```{python}
 # | label: hydrologic_group_map
-# | layout-ncol: 2
+# | layout-ncol: 1
+# | echo: false
+# | fig-cap: "Hydrologic groups"
 
 with gs.RegionManager(raster="hydgrp", s="s-50000", flags="a"):
     tools.g_region(raster="hydgrp_sda", flags="p")
@@ -255,15 +331,16 @@ with gs.RegionManager(raster="hydgrp", s="s-50000", flags="a"):
     m.d_legend(raster="hydgrp", flags="bn", at="0, 30, 1, 30")
     m.show()
 
-    m = gj.Map(use_region=False)
-    m.d_shade(shade="relief", color="hydgrp_sda")
-    m.d_legend(raster="hydgrp_sda", flags="bn")
-    m.show()
+    # m = gj.Map(use_region=False)
+    # m.d_shade(shade="relief", color="hydgrp_sda")
+    # m.d_legend(raster="hydgrp_sda", flags="bn")
+    # m.show()
 ```
 
-Let's compare the hydrologic group maps to make sure they are the same. We can use `r.mapcalc` to create a new raster that is the difference between the two maps. If the maps are the same, then the difference should be all zeros.
 
 ```{python}
+# | label: hydrologic_group_map_comparison
+# | echo: false
 tools.r_mapcalc(
     expression="hydgrp_diff = hydgrp - hydgrp_sda",
 )
