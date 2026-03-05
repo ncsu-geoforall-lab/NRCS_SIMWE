@@ -2,7 +2,7 @@
 jupyter: python3
 author: Corey T. White
 execute:
-  eval: false
+  eval: true
   freeze: auto
 date-modified: today
 format:
@@ -68,7 +68,6 @@ flowchart TD
     SIMWE --> DISCHARGE("Discharge raster")
 ```
 
-
 ## Objectives
 
 1. **Import SSURGO soil data** into GRASS using `r.in.ssurgo`.
@@ -108,6 +107,8 @@ import grass.script as gs
 import grass.jupyter as gj
 from grass.tools import Tools
 ```
+
+We will examine the Coweeta site for this demonstration, which has a mapset called `ssurgo_demo` that we will use to import the SSURGO data and run the SIMWE model.
 
 ```{python}
 # | label: init_session
