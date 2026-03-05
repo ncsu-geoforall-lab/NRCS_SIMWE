@@ -113,19 +113,22 @@ Import SSURGO data using `r.in.ssurgo`. Note that this will import the soil area
 ```{python}
 # | label: import_ssurgo_local
 # | eval: false
-tools.r_in_ssurgo(
-    ssurgo_path="../data/gSSURGO_CONUS.zip/gSSURGO_CONUS.gdb",
-    ssurgo_areas="soil_areas",
+
+results = tools.r_in_ssurgo(
+    ssurgo_path="../data/gSSURGO_NC.zip",
+    soils="soil_areas",
     hydgrp="hydgrp",
     ksat_l="ksat_l",
     ksat_r="ksat_r",
     ksat_h="ksat_h",
     mukey="mukey",
     hzdept_r=0,
-    hzdepb_r=25,
+    hzdepb_r=100,
     desgnmaster="A",
     nprocs=30
 )
+
+print(results)
 ```
 
 
@@ -134,17 +137,16 @@ tools.r_in_ssurgo(
 # | label: import_ssurgo_sda
 # | eval: false
 tools.r_in_ssurgo(
-    ssurgo_areas="soil_areas_sda",
+    soils="soil_areas_sda",
     hydgrp="hydgrp_sda",
     ksat_l="ksat_l_sda",
     ksat_r="ksat_r_sda",
     ksat_h="ksat_h_sda",
     mukey="mukey_sda",
     hzdept_r=0,
-    hzdepb_r=25,
+    hzdepb_r=100,
     desgnmaster="A",
-    nprocs=30,
-    flags="d",
+    nprocs=30
 )
 ```
 
@@ -157,8 +159,16 @@ print(tools.g_list(type="vector", mapset=mapset).text)
 ```
 
 ```{python}
-# | label: soil attributes
+# | label: SDA soil attributes
 json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
+df = pd.DataFrame(json_data["records"])
+df.head()
+```
+
+```{python}
+# | label: local soil attributes
+
+json_data = tools.v_db_select(map="soil_areas", format="json").json
 df = pd.DataFrame(json_data["records"])
 df.head()
 ```
@@ -173,6 +183,14 @@ print(tools.g_list(type="raster", mapset=mapset).text)
 # | label: mukey
 m = gj.Map(use_region=True)
 m.d_shade(shade="relief", color="mukey")
+m.d_vect(map="soil_areas", color="black", fillcolor="none", width=0.5)
+# m.d_legend(raster="mukey", title="MUKEY", flags="b")
+m.show()
+
+# | label: mukey
+m = gj.Map(use_region=True)
+m.d_shade(shade="relief", color="mukey_sda")
+# m.d_vect(map="soil_areas_sda", color="white", fillcolor="none", width=0.5)
 # m.d_legend(raster="mukey", title="MUKEY", flags="b")
 m.show()
 ```
