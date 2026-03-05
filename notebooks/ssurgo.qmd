@@ -136,7 +136,6 @@ tools.g_extension(
 ```
 
 ::: {.panel-tabset}
-
 ## Command Line
 
 ```sh
@@ -144,12 +143,12 @@ g.extension r.in.ssurgo
 ```
 
 ## Python (grass.tools)
-
 ```python
 tools.g_extension(
     extension="r.in.ssurgo"
 )
 ```
+
 :::
 
 Set the computational region to the elevation raster and create a relief raster for hillshading.
@@ -171,11 +170,12 @@ Import SSURGO data using `r.in.ssurgo`. Note that this will import the soil area
 ::: {.panel-tabset}
 
 ## Local Import
+
 ```{python}
 # | label: import_ssurgo_local
 # | eval: false
 
-results = tools.r_in_ssurgo(
+tools.r_in_ssurgo(
     ssurgo_path="../data/gSSURGO_NC.zip",
     soils="soil_areas",
     hydgrp="hydgrp",
@@ -188,12 +188,11 @@ results = tools.r_in_ssurgo(
     desgnmaster="A",
     nprocs=30
 )
-
-print(results)
 ```
 
 
 ## SDA Import
+
 ```{python}
 # | label: import_ssurgo_sda
 # | eval: false
@@ -213,34 +212,15 @@ tools.r_in_ssurgo(
 
 :::
 
-
-```{python}
-# | label: vector_maps
-print(tools.g_list(type="vector", mapset=mapset).text)
-```
-
-```{python}
-# | label: SDA soil attributes info
-# | echo: false
-json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
-df = pd.DataFrame(json_data["records"])
-df.info()
-```
+The tool imports the soil polygons as a vector map (`soil_areas_sda`), which contains the soil polygons with attributes from the SSURGO database.
 
 ```{python}
 # | label: SDA soil attributes
 # | echo: false
+
 json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
 df = pd.DataFrame(json_data["records"])
-df.head()
-```
-
-```{python}
-# | label: local soil attributes
-# | echo: false
-json_data = tools.v_db_select(map="soil_areas", format="json").json
-df = pd.DataFrame(json_data["records"])
-df.info()
+display(df.head())
 ```
 
 ```{python}
@@ -252,6 +232,7 @@ print(tools.g_list(type="raster", mapset=mapset).text)
 ```{python}
 # | label: mukey
 # | echo: false
+
 # m = gj.Map(use_region=True)
 # m.d_shade(shade="relief", color="mukey")
 # m.d_vect(map="soil_areas", color="black", fillcolor="none", width=0.5)
