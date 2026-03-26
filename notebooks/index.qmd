@@ -13,4 +13,5 @@ listing:
      - "sensitivity_analysis.qmd"
      - "workshop.ipynb"
      - "ssurgo.qmd"
+     - "ssurgo_clay_center.qmd"
 ---

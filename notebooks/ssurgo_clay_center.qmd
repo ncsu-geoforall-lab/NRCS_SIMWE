@@ -16,7 +16,7 @@ format:
     lightbox: true
 ---
 
-# [WIP] SSURGO Soil Data in GRASS
+# [WIP] Clay Center, KS - Soil informed rainfall excess overland flow simulation
 
 This notebook demonstrates how to import SSURGO soil data into GRASS using the [r.in.ssurgo](https://grass.osgeo.org/grass-devel/manuals/addons/r.in.ssurgo.html) extension. The `r.in.ssurgo` tool can import both local SSURGO data and data from the Soil Data Access (SDA) web service. The imported data includes *soil areas*, *hydrologic groups*, *ksat maps*, and *mukey maps*, which can be used for hydrological modeling and analysis in GRASS.
 
@@ -59,7 +59,7 @@ import grass.jupyter as gj
 from grass.tools import Tools
 ```
 
-We will examine the Coweeta site for this demonstration, which has a mapset called `ssurgo_demo` that we will use to import the SSURGO data and run the SIMWE model.
+We will examine the Clay Center, KS (39.4003765, -97.0630433) site for this demonstration, which has a mapset called `ssurgo_demo` that we will use to import the SSURGO data and run the SIMWE model.
 
 ```{python}
 # | label: init_session
@@ -74,6 +74,8 @@ try:
     tools.g_mapset(mapset=mapset, flags="c")
 except Exception as e:
     print(f"{e}")
+finally:
+    session.switch_mapset(mapset)
 ```
 
 ---
@@ -82,7 +84,7 @@ Set the computational region to the elevation raster and create a relief raster 
 
 ```{python}
 # | label: set_region
-region_text = tools.g_region(raster="elevation", flags="p").text
+region_text = tools.g_region(raster="elevation", flags="pac").text
 print(region_text)
 ```
 
@@ -370,6 +372,336 @@ display(
 )
 ```
 
+
+## NOAA Atlas Precipitation Frequency
+
+```{python}
+# | label: noaa-import-func
+# | echo: false
+from __future__ import annotations
+
+import csv
+import io
+import re
+from typing import Any, Literal
+
+
+class PFDSParseError(Exception):
+    """Raised when a PFDS response cannot be parsed."""
+
+
+BoundType = Literal["expected", "upper", "lower", "all"]
+OutputType = Literal["json", "csv"]
+
+
+def fetch_pfds_table(
+    lat: float,
+    lon: float,
+    data: Literal["depth", "intensity"] = "intensity",
+    units: Literal["metric", "english"] = "metric",
+    series: Literal["pds", "ams"] = "pds",
+    timeout: int = 30,
+    session: Any | None = None,
+) -> tuple[str, dict[str, Any]]:
+    import requests
+
+    valid_data = {"depth", "intensity"}
+    valid_units = {"metric", "english"}
+    valid_series = {"pds", "ams"}
+
+    if data not in valid_data:
+        raise ValueError(f"data must be one of {sorted(valid_data)}")
+    if units not in valid_units:
+        raise ValueError(f"units must be one of {sorted(valid_units)}")
+    if series not in valid_series:
+        raise ValueError(f"series must be one of {sorted(valid_series)}")
+
+    url = "https://hdsc.nws.noaa.gov/cgi-bin/new/fe_text.csv"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "data": data,
+        "units": units,
+        "series": series,
+    }
+
+    http = session or requests
+    resp = http.get(url, params=params, timeout=timeout)
+    resp.raise_for_status()
+
+    request_info = {
+        "lat": lat,
+        "lon": lon,
+        "data": data,
+        "units": units,
+        "series": series,
+        "url": resp.url,
+    }
+    return resp.text, request_info
+
+
+def parse_pfds_table(
+    text: str,
+    request: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Parse PFDS response into structured sections:
+      - expected
+      - upper
+      - lower
+    """
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        raise PFDSParseError("Empty PFDS response.")
+
+    result: dict[str, Any] = {
+        "request": request or {},
+        "metadata": {},
+        "tables": {
+            "expected": {"return_periods_years": [], "rows": []},
+            "upper": {"return_periods_years": [], "rows": []},
+            "lower": {"return_periods_years": [], "rows": []},
+        },
+    }
+
+    current_section = "expected"
+    current_return_periods: list[int | float | str] | None = None
+
+    for line in lines:
+        low = line.lower()
+
+        # Section switches
+        if "upper bound of 90% confidence interval" in low:
+            current_section = "upper"
+            current_return_periods = None
+            continue
+
+        if "lower bound of 90% confidence interval" in low:
+            current_section = "lower"
+            current_return_periods = None
+            continue
+
+        # Skip footer/runtime lines
+        if low.startswith("date/time"):
+            continue
+        if low.startswith("pyruntime"):
+            continue
+
+        # Capture metadata before data table starts
+        if current_section == "expected" and current_return_periods is None:
+            m = re.match(r"^\s*([^=,:]+?)\s*[:=]\s*(.+?)\s*$", line)
+            if m and not low.startswith("by duration for ari"):
+                key = re.sub(r"\s+", "_", m.group(1).strip().lower())
+                result["metadata"][key] = m.group(2).strip()
+
+        # Header row like: by duration for ARI (years):,1,2,5,...
+        if low.startswith("by duration for ari"):
+            row = next(csv.reader([line]))
+            if len(row) < 2:
+                raise PFDSParseError(f"Malformed ARI header row: {line}")
+
+            current_return_periods = [_parse_numeric_label(cell) for cell in row[1:]]
+            result["tables"][current_section]["return_periods_years"] = current_return_periods
+            continue
+
+        # Data rows only valid after a header row
+        if current_return_periods is None:
+            continue
+
+        row = next(csv.reader([line]))
+        if len(row) < 2:
+            continue
+
+        duration = row[0].strip()
+        if not duration:
+            continue
+
+        # Clean duration labels like "5-min:" -> "5-min"
+        duration = duration.rstrip(":").strip()
+
+        # Ignore repeated narrative/header junk if it leaks through
+        if duration.lower().startswith("precipitation frequency estimates"):
+            continue
+        if duration.lower().startswith("by duration for ari"):
+            continue
+
+        values: dict[str, float | str | None] = {}
+        numeric_count = 0
+
+        for rp, cell in zip(current_return_periods, row[1:]):
+            key = str(rp)
+            cell = cell.strip()
+
+            if cell in {"", "-", "--", "---"}:
+                values[key] = None
+                continue
+
+            try:
+                values[key] = float(cell)
+                numeric_count += 1
+            except ValueError:
+                values[key] = cell
+
+        # Only keep actual duration rows
+        if numeric_count == 0:
+            continue
+
+        result["tables"][current_section]["rows"].append(
+            {
+                "duration": duration,
+                "values": values,
+            }
+        )
+
+    # Sanity check
+    if not result["tables"]["expected"]["rows"]:
+        raise PFDSParseError("No expected-value PFDS rows were parsed.")
+
+    return result
+
+
+def pfds_json_to_csv_text(
+    pfds_json: dict[str, Any],
+    bound: BoundType = "expected",
+    float_format: str = "g",
+) -> str:
+    """
+    Convert one PFDS bound section to compact CSV text.
+    """
+    if bound == "all":
+        parts = []
+        for name in ("expected", "upper", "lower"):
+            parts.append(f"# {name}")
+            parts.append(pfds_json_to_csv_text(pfds_json, bound=name, float_format=float_format).rstrip())
+            parts.append("")
+        return "\n".join(parts).rstrip() + "\n"
+
+    table = pfds_json.get("tables", {}).get(bound)
+    if not table:
+        raise ValueError(f"Bound '{bound}' not found in parsed PFDS JSON.")
+
+    return_periods = table.get("return_periods_years", [])
+    rows = table.get("rows", [])
+
+    if not return_periods or not rows:
+        raise ValueError(f"PFDS JSON for bound '{bound}' is missing table data.")
+
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+
+    header = ["duration"] + [_format_return_period_label(rp) for rp in return_periods]
+    writer.writerow(header)
+
+    for row in rows:
+        out_row = [row["duration"]]
+        for rp in return_periods:
+            val = row["values"].get(str(rp))
+            if val is None:
+                out_row.append("")
+            elif isinstance(val, float):
+                out_row.append(format(val, float_format))
+            else:
+                out_row.append(str(val))
+        writer.writerow(out_row)
+
+    return out.getvalue()
+
+
+def get_pfds_table(
+    lat: float,
+    lon: float,
+    data: Literal["depth", "intensity"] = "intensity",
+    units: Literal["metric", "english"] = "metric",
+    series: Literal["pds", "ams"] = "pds",
+    output: OutputType = "json",
+    bound: BoundType = "expected",
+    timeout: int = 30,
+    session: Any | None = None,
+    float_format: str = "g",
+) -> dict[str, Any] | str:
+    """
+    High-level wrapper.
+
+    bound:
+      - expected : central estimate only
+      - upper    : upper 90% bound only
+      - lower    : lower 90% bound only
+      - all      : all three
+    """
+    text, request = fetch_pfds_table(
+        lat=lat,
+        lon=lon,
+        data=data,
+        units=units,
+        series=series,
+        timeout=timeout,
+        session=session,
+    )
+
+    parsed = parse_pfds_table(text=text, request=request)
+
+    if output == "json":
+        if bound == "all":
+            return parsed
+        return {
+            "request": parsed["request"],
+            "metadata": parsed["metadata"],
+            "table": parsed["tables"][bound],
+            "bound": bound,
+        }
+
+    if output == "csv":
+        return pfds_json_to_csv_text(parsed, bound=bound, float_format=float_format)
+
+    raise ValueError("output must be 'json' or 'csv'")
+
+
+def _parse_numeric_label(value: str) -> int | float | str:
+    value = value.strip()
+    try:
+        n = float(value)
+        return int(n) if n.is_integer() else n
+    except ValueError:
+        return value
+
+
+def _format_return_period_label(value: int | float | str) -> str:
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else format(value, "g")
+    return str(value)
+```
+
+```{python}
+# | label: noaa-percip-freq
+# | echo: false
+
+pfds_json = get_pfds_table(
+        lat=39.4003765,
+        lon=-97.0630433,
+        data="intensity",
+        units="english",
+        series="pds",
+        output="json",
+)
+print(pfds_json)
+
+# CSV-style output
+pfds_csv = get_pfds_table(
+    lat=39.4003765,
+    lon=-97.0630433,
+    data="intensity",
+    units="english",
+    series="pds",
+    output="csv",
+    bound="expected",   # <- this is the key fix
+    float_format=".3g",
+)
+print(pfds_csv)
+```
+
+
 We can use the the `time_concentration` raster as an input to the `r.runoff` tool, which calculates runoff depth and peak discharge using the curve number method. The `r.runoff` tool also requires a precipitation raster, which we can create using `r.mapcalc` with a constant value for precipitation ($50$ mm) over a 24 hour period.
 
 ```{python}
@@ -381,7 +713,7 @@ df_tc_min = df_tc[["min", "mean", "max"]].apply(
 max_tc = df_tc_min["max"].max()
 print(max_tc)
 
-df_rf_intensity = pd.read_csv("data/r_intensity_pds.csv")
+df_rf_intensity = pd.read_csv(io.StringIO(pfds_csv))
 display(
     df_rf_intensity.style.hide(axis="index")
     .set_caption("Rainfall Intensity — NOAA Atlas 14, Coweeta, NC")
@@ -502,14 +834,14 @@ storm_intensity_100yr = float(
     )
 )
 
-rain_mm_per_hour = storm_intensity_100yr
+rain_inches_per_hour = storm_intensity_100yr
 
 display(
     pd.DataFrame(
         {
             "return_period": [rp_100],
             "max_tc_min": [round(max_tc, 2)],
-            "intensity_mm_hr": [round(storm_intensity_100yr, 2)],
+            "intensity_in_hr": [round(storm_intensity_100yr, 2)],
         }
     ).style.hide(axis="index").set_caption(
         "Interpolated rainfall intensity at maximum time of concentration"
@@ -522,15 +854,16 @@ print(f"100-year storm intensity at max Tc ({max_tc:.2f} min): {storm_intensity_
 ```{python}
 # | label: precipitation_mm
 
-# storm_intensity_100yr 46.97 min = 0.7828 hr
-duration_min = 46.97
-intensity_in_hr = 4.34
+duration_min = round(max_tc, 2)
+intensity_in_hr =rain_inches_per_hour
 intensity_mm_hr = intensity_in_hr * 25.4
 
 duration_hr = duration_min / 60.0
 rain_mm = intensity_mm_hr * duration_hr
 
+print(f"Storm duration: {duration_min:.4f} min")
 print(f"Storm duration: {duration_hr:.4f} hr")
+print(f"Rainfall intensity: {intensity_in_hr:.3f} in/hr")
 print(f"Rainfall intensity: {intensity_mm_hr:.3f} mm/hr")
 print(f"Rain depth: {rain_mm:.3f} mm")
 tools.r_mapcalc(
@@ -540,11 +873,15 @@ tools.r_mapcalc(
 
 ```{python}
 # | label: runoff_calculation
+# tools.g_extension(extension="r.runoff", url="../../../cwhite911/grass-addons/src/raster/r.runoff")
+# Make sure you have the following GRASS addons installed
+# - r.accumulate
+# - r.runoff
 
 tools.r_runoff(
     rainfall="rain",
     direction="flow_direction",
-    duration=duration_hr,  # 0.7828 hrs
+    duration=duration_hr,  # hours
     curvenumber="curvenumber",
     time_concentration="time_concentration",
     runoff_depth="runoff_depth",
@@ -561,7 +898,7 @@ Let's visualize the runoff depth
 
 ```{python}
 # | label: runoff_map
-with gs.RegionManager(raster="runoff_depth", w="w-200", flags="a"):
+with gs.RegionManager(raster="runoff_depth", s="s-200", flags="a"):
     tools.r_colors(map="runoff_depth", color="water")
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="runoff_depth")
@@ -576,29 +913,36 @@ Peak discharge and time to peak discharge maps
 
 ```{python}
 # | label: peak_discharge_map
+# | echo: false
+# | layout-ncol: 2
+# | fig-cap: Discharge
+# | fig-subcap:
+# |     - Peak Discharge (m³/s)
+# |     - Time to Peak (hours)
 
-with gs.RegionManager(raster="peak_discharge", w="w-200", flags="a"):
-    tools.r_colors(map="peak_discharge", color="magma", flags="")
+
+with gs.RegionManager(raster="peak_discharge", s="s-200", flags="a"):
+    tools.r_colors(map="peak_discharge", color="haxby", flags="gn")
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="peak_discharge")
 
     m.d_legend(
         raster="peak_discharge",
-        at="5, 30, 2, 10",
-        title="Peak Discharge (m³/s)",
-        flags="d",
+        at="8, 12, 20, 80",
+        # title="Peak Discharge (m³/s)",
+        flags="l",
     )
     m.show()
 
-    tools.r_colors(map="time_to_peak", color="magma", flags="e")
+    tools.r_colors(map="time_to_peak", color="haxby", flags="gn")
     m1 = gj.Map(use_region=True)
     m1.d_shade(shade="relief", color="time_to_peak")
 
     m1.d_legend(
         raster="time_to_peak",
-        at="5, 30, 2, 10",
-        title="Time to Peak (hours)",
-        flags="d",
+        at="8, 12, 20, 80",
+        # title="Time to Peak (hours)",
+        flags="l",
     )
     m1.show()
 ```
@@ -654,25 +998,27 @@ Calcuate the slope and aspect from the elevation raster, which are required inpu
 
 ### Precipitation and Rainfall Excess
 
-We will use a constant rainfall value for the simulation, which is based on the 60 min 100 year storm from NOAA Atlas 14 for Coweeta, NC. The rainfall excess is calculated as the runoff depth divided by the duration of the storm (24 hours) to get a rainfall excess in mm/hr.
+We will use a constant rainfall value for the simulation, which is based on an 100 year storm from NOAA Atlas 14 for Clay Center, KS. The rainfall excess is calculated as the runoff depth (mm), dervied using the SCS-CN method, divided by the 24 hours to get a rainfall excess in mm/hr.
 
 | **Location Information** | **Value** |
 |---|---|
-| Name | Otto, North Carolina, USA* |
-| Station name | COWEETA EXP STN |
-| Site ID | 31-2102 |
-| Latitude | 35.0667° |
-| Longitude | -83.4333° |
-| Elevation | 2700 ft** |
-
-![Coweeta Hydrologic Lab](data/coweeta_exp_stn.png)
+| Name | Clay Center, Kansas, USA* |
+| Station name |  |
+| Site ID |  |
+| Latitude | 39.4003765° |
+| Longitude | -97.0630433° |
+| Elevation | ft** |
+<!-- ![Coweeta Hydrologic Lab](data/coweeta_exp_stn.png) -->
 
 Rainfall excess map
 
 ```{python}
 # | label: rainfall_excess_map
 
-# Time of Concentration: 46.8 min
+# Convert runoff_depth (mm) to rainfall excess.
+# Runoff depth per cell [mm] is calculated by the SCS-CN method.
+
+
 tools.r_mapcalc(
     expression=f"rainfall_excess = runoff_depth / 24.0",
 )
@@ -712,21 +1058,22 @@ Calcuate the overland flow for a 47 min 100 year storm using the `r.sim.water` t
 # | label: r_sim_water
 # | eval: false
 
-# duration_min = 46.97 round to 47 min for simulation
+# 100yr storm running for 54.05 min with soil informed
+# Rainfall excess
+# duration_min = 54.05
 tools.r_slope_aspect(elevation="elevation", dx="dx", dy="dy")
 tools.r_sim_water(
     elevation="elevation",
-    depth="tc_100yr_depth",
-    discharge="tc_100yr_discharge",
-    walkers_output="tc_100yr_walkers",
+    depth="rx_100yr_depth",
+    discharge="rx_100yr_discharge",
+    walkers_output="rx_100yr_walkers",
     rain="rainfall_excess",  # Infiltration / Veg Intercept
     man="mannings_n",  # Mixed forest Kalyanapu et al. (2009)
     nwalkers=100000,
     # infil="ksat_r_sda", # Infiltration of flowing water
     # niterations=1440 / 2,
-    niterations=48,
-    # mintimestep=0,
-    output_step=2,
+    duration=duration_min, # Duration of the simulated water flow [minutes]
+    output_step=2, # Time interval for creating output maps [minutes]
     nprocs=30,
     flags="t",
 )
@@ -734,7 +1081,7 @@ tools.r_sim_water(
 # Register the output maps into a space time dataset
 gs.run_command(
     "t.create",
-    output="tc_100yr_depth_sum",
+    output="rx_100yr_depth_sum",
     type="strds",
     temporaltype="absolute",
     title="Runoff Depth",
@@ -744,13 +1091,13 @@ gs.run_command(
 
 # Get the list of depth maps
 depth_list = gs.read_command(
-    "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
+    "g.list", type="raster", pattern="rx_100yr_depth.*", separator="comma"
 ).strip()
 
 # Register the maps
 gs.run_command(
     "t.register",
-    input="tc_100yr_depth_sum",
+    input="rx_100yr_depth_sum",
     type="raster",
     start="2024-01-01",
     increment="2 minutes",
@@ -762,18 +1109,24 @@ gs.run_command(
 ```
 
 ```{python}
-# | label: tc_100yr_depth_map
+# | label: rx_depth_sum_info
+
+tools.t_info(input="rx_100yr_depth_sum")
+```
+
+```{python}
+# | label: rx_100yr_depth_map
 # | eval: true
 
 depth_list = gs.read_command(
-    "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
+    "g.list", type="raster", pattern="rx_100yr_depth.*", separator="comma"
 ).strip()
 
-max_depth = "tc_100yr_depth.47"  # Get the last depth map for the maximum depth after 48 iterations (96 minutes)
+max_depth = depth_list.split(",")[-1]
 with gs.RegionManager(raster="accumulation", s="s-200", flags="a"):
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="naip_2021_rgb@naip")
-    m.d_rast(map=max_depth, values="0.005-0.44")
+    m.d_rast(map=max_depth, values="0.025-0.46251")
     m.d_legend(
         raster=max_depth,
         title="Deqpth [m]",
@@ -803,21 +1156,21 @@ Animation of depth maps
 # | label: tc_100_depth_map
 # | eval: false
 m = gj.TimeSeriesMap(use_region=True, width=800)
-m.d_rast(map="relief")
-m.add_raster_series("tc_100yr_depth_sum", values="0.005-0.44")
+m.d_rast(map="naip_2021_rgb@naip")
+m.add_raster_series("rx_100yr_depth_sum", values="0.025-0.46251")
 m.d_legend(
-    raster="tc_100yr_depth.47",
+    raster=max_depth,
     title="Depth [m]",
     flags="bt",
     border_color="none",
     at=(1, 50, 0, 5),
 )
 
-m.save("output/clay_center_tc_100yr_simwe_depth_animation.gif")
+m.save("output/clay_center_rx_100yr_simwe_depth_animation.gif")
 m.show()
 ```
 
-![Overland Flow Simulation with Soil Data](output/clay_center_tc_100yr_simwe_depth_animation.gif)
+![Overland Flow Simulation with Soil Data](output/clay_center_rx_100yr_simwe_depth_animation.gif)
 
 No soils
 
@@ -827,16 +1180,14 @@ No soils
 
 tools.r_sim_water(
     elevation="elevation",
-    depth="no_soil_48_min_depth",
-    discharge="no_soil_48_min_discharge",
-    walkers_output="no_soil_walkers",
-    rain_value=rain_mm_per_hour,
-    # rain="rainfall_excess",  # Infiltration / Veg Intercept
+    depth="no_soil_depth",
+    discharge="no_soil_disch",
+    walkers_output="no_soil_particles",
+    rain_value=intensity_mm_hr, # Rainfall intensity: 95.584 mm/hr
     man="mannings_n",  # Mixed forest Kalyanapu et al. (2009)
     nwalkers=100000,
     # infil="ksat_r_sda", # Infiltration of flowing water
-    niterations=48,
-    # mintimestep=0,
+    niterations=duration_min,
     output_step=2,
     nprocs=30,
     flags="t",
@@ -854,7 +1205,7 @@ gs.run_command(
 
 # Get the list of depth maps
 depth_list = gs.read_command(
-    "g.list", type="raster", pattern="no_soil_48_min_depth.*", separator="comma"
+    "g.list", type="raster", pattern="no_soil_depth.*", separator="comma"
 ).strip()
 
 # Register the maps
@@ -871,19 +1222,25 @@ gs.run_command(
 ```
 
 ```{python}
+# | label: no_soil_depth_sum_info
+
+tools.t_info(input="no_soil_depth_sum")
+```
+
+```{python}
 
 depth_list = gs.read_command(
     "g.list", type="raster", pattern="no_soil_depth.*", separator="comma"
 ).strip()
 
-print(depth_list)
+no_soils_max_depth = depth_list.split(",")[-1]
 
 with gs.RegionManager(raster="accumulation", s="s-200", flags="a"):
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="naip_2021_rgb@naip")
-    m.d_rast(map="no_soil_depth.719", values="0.005-1.25")
+    m.d_rast(map=no_soils_max_depth, values="0.025-1.307113")
     m.d_legend(
-        raster="no_soil_depth.719",
+        raster=no_soils_max_depth,
         title="Depth [m]",
         flags="btl",
         border_color="none",
@@ -899,10 +1256,10 @@ no soil animation
 # | eval: false
 
 m = gj.TimeSeriesMap(use_region=True, width=800)
-m.d_rast(map="relief")
-m.add_raster_series("no_soil_depth_sum", values="0.005-1.25")
+m.d_rast(map="naip_2021_rgb@naip")
+m.add_raster_series("no_soil_depth_sum", values="0.025-1.307113")
 m.d_legend(
-    raster="no_soil_depth.719",
+    raster=no_soils_max_depth,
     title="Depth [m]",
     flags="bt",
     border_color="none",
