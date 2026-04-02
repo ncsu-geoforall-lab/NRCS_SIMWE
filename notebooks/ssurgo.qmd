@@ -456,13 +456,50 @@ tools.g_extension(
 # | label: install_runoff_extension
 # | eval: false
 # | echo: false
+# tools.g_extension(
+#     extension="r.accumulate",
+#     url="../../../cwhite911/grass-addons/src/raster/r.accumulate",
+# )
+# tools.g_extension(
+#     extension="r.runoff", url="../../../cwhite911/grass-addons/src/raster/r.runoff"
+# )
 tools.g_extension(
-    extension="r.accumulate",
-    url="../../../cwhite911/grass-addons/src/raster/r.accumulate",
+    extension="r.noaa.atlas14",
+    url="../../../cwhite911/grass-addons/src/raster/r.noaa.atlas14",
 )
-tools.g_extension(
-    extension="r.runoff", url="../../../cwhite911/grass-addons/src/raster/r.runoff"
-)
+```
+
+```{python}
+# | label: noaa_atlas14
+
+# tools.r_noaa_atlas14(
+#     mode="grid",
+#     statistic="intensity",
+#     unit="metric",
+#     series="pds",
+#     bound="expected",
+#     resample="bilinear",
+#     flags="i",
+#     # region="se",
+#     base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
+# )
+# | Latitude | 35.0667° |
+# | Longitude | -83.4333° |
+outjson = tools.r_noaa_atlas14(
+    mode="point",
+    statistic="intensity",
+    vector_output="noaa_atlas14_station",
+    coordinates=[-83.4333, 35.0667],
+    unit="metric",
+    series="pds",
+    bound="expected",
+    resample="bilinear",
+    # flags="i",
+    # region="se",
+    # base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
+).json
+
+pprint(outjson)
 ```
 
 We need the flow direction and stream maps to run `r.runoff` with time of concentration, which can be calculated using the `r.watershed` tool.
@@ -965,7 +1002,9 @@ tools.r_sim_water(
     nwalkers=100000,
     # infil="ksat_r_sda", # Infiltration of flowing water
     # niterations=1440 / 2,
-    niterations=48,
+    observation="sample_outlets",
+    logfile="coweeta_100yr_simulation.log",
+    duration=48, # Minutes
     # mintimestep=0,
     output_step=2,
     nprocs=30,
@@ -1004,17 +1043,32 @@ gs.run_command(
 
 ```{python}
 # | label: tc_100yr_depth_map
-# | eval: false
+# | eval: true
 
 with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
-    m = gj.Map(use_region=True)
+    depth_list = gs.read_command(
+        "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
+    ).strip()
+
+    max_depth = depth_list.split(",")[-1]
+    stats = tools.r_info(map=max_depth, format="json").json
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="naip_2022_rgb@naip")
-    m.d_rast(map="tc_100yr_depth.48", values="0.025-0.237")
+    m.d_rast(map=max_depth, values=f"0.005-{stats['max']}")
+    m.d_vect(
+        map="sample_outlets",
+        type="point",
+        color="black",
+        fill_color="orange",
+        icon="basic/circle",
+        size=10,
+    )
     m.d_legend(
-        raster="tc_100yr_depth.48",
+        raster=max_depth,
         title="Deqpth [m]",
         at="8, 12, 15, 85",
         font="Fira Sans Condensed Light",
+        range=[0.005, stats["max"]],
         fontsize=14,
         flags="",
     )
@@ -1038,14 +1092,21 @@ Animation of depth maps
 ```{python}
 # | label: tc_100_depth_map
 # | eval: false
+depth_list = gs.read_command(
+    "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
+).strip()
+
+max_depth = depth_list.split(",")[-1]
+stats = tools.r_info(map=max_depth, format="json").json
 m = gj.TimeSeriesMap(use_region=True)
 m.d_rast(map="relief")
-m.add_raster_series("tc_100yr_depth_sum", values="0.025-1.41")
+m.add_raster_series("tc_100yr_depth_sum", values=f"0.025-{stats['max']}")
 m.d_legend(
-    raster="tc_100yr_depth.48",
+    raster=max_depth,
     title="Depth [m]",
     flags="bt",
     border_color="none",
+    range=[0.005, stats["max"]],
     at=(1, 50, 0, 5),
 )
 

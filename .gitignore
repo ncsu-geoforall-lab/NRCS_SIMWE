@@ -179,7 +179,10 @@ docs/
 # Ruff
 .ruff_cache/
 
-**/*.quarto_ipynb
+**/*.quarto_ipynb*
 test_keyvalue_result.txt
 
 data/*.zip
+app/
+*.3mf
+**/*.quarto_ipynb
