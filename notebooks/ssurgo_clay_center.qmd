@@ -155,20 +155,66 @@ m.show()
 # |     - High
 
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_l_sda")
-m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
+def ksat_color_scheme() -> None:
+    """Apply ksat color scheme to elevation map."""
+    gs.verbose(_("Applying ksat color scheme..."))
+    ksat_color_palette = [
+        # Very low Ksat (clays, compacted soils)
+        ("0%", "#3B1F0E"),  # very slow infiltration
+        ("10%", "#5A2D1A"),
+        ("20%", "#7A3F1D"),
+        # Low–moderate Ksat
+        ("30%", "#9C5A2A"),
+        ("40%", "#B97C3F"),
+        # Transitional (loams)
+        ("50%", "#D6A95C"),
+        # Moderate–high Ksat
+        ("60%", "#BFD38A"),
+        ("70%", "#8FCB9B"),
+        # High Ksat (sands)
+        ("80%", "#5FB7B2"),
+        ("90%", "#3A8FB7"),
+        # Very high Ksat (gravel / macroporous)
+        ("100%", "#1E5E8C"),
+    ]
+    # Convert palette list to rules string for r_colors
+    ksat_color_scheme = (
+        "\n".join(f"{pos} {color}" for pos, color in ksat_color_palette) + "\n"
+    )
+    return ksat_color_scheme
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_r_sda")
-m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
+from io import StringIO
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_h_sda")
-m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
+with gs.RegionManager(raster="ksat_l_sda", s="s-275", flags="a"):
+    tools.r_colors(
+        map=["ksat_l_sda", "ksat_r_sda", "ksat_h_sda"], rules=StringIO(ksat_color_scheme())
+    )
+    m = gj.Map(use_region=True, width=600)
+    m.d_shade(shade="relief", color="ksat_l_sda", brighten=30)
+    m.d_legend(
+        raster="ksat_l_sda",
+        title="Ksat (mm/hr)",
+        at="8, 12, 20, 80",
+    )
+    m.show()
+
+    m = gj.Map(use_region=True, width=600)
+    m.d_shade(shade="relief", color="ksat_r_sda", brighten=30)
+    m.d_legend(
+        raster="ksat_r_sda",
+        title="Ksat (mm/hr)",
+        at="8, 12, 20, 80",
+    )
+    m.show()
+
+    m = gj.Map(use_region=True, width=600)
+    m.d_shade(shade="relief", color="ksat_h_sda", brighten=30)
+    m.d_legend(
+        raster="ksat_h_sda",
+        title="Ksat (mm/hr)",
+        at="8, 12, 20, 80",
+    )
+    m.show()
 ```
 
 ### Hydrologic Group
