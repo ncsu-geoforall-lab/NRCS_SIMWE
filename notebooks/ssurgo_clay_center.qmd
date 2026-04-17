@@ -1,6 +1,7 @@
 ---
 jupyter: python3
 author: Corey T. White
+image: output/ksat-output-3.png
 execute:
   eval: true
   freeze: auto
@@ -48,17 +49,39 @@ from PIL import Image
 import sqlite3
 from IPython.display import IFrame
 
-# Ask GRASS GIS where its Python packages are.
+# Ask GRASS where its Python packages are.
 sys.path.append(
     subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
 )
 
-# Import the GRASS GIS packages we need.
+# Import the GRASS packages we need.
 import grass.script as gs
 
 # Import GRASS Jupyter
 import grass.jupyter as gj
 from grass.tools import Tools
+```
+
+---
+
+```{python}
+# | label: install_addons
+# | eval: false
+
+addons = [
+    "r.in.ssurgo",
+    "r.curvenumber",
+    "r.runoff",
+    "r.accumulate",
+    "r.timeofconcentration",
+    "r.noaa.atlas14",
+    "r.manning",
+    "r.stream.distance",
+    "r.stream.basins",
+]
+
+for addon in addons:
+    tools.g_extension(extension=addon)
 ```
 
 ## Study Area
@@ -96,11 +119,12 @@ study_area_map = gj.InteractiveMap(
     use_region=True,
 )
 study_area_map.map.add(Marker(location=(39.4003765, -97.0630433), title="Clay Center"))
+study_area_map.map.center = (39.4003765, -97.0630433)
+study_area_map.map.zoom = 11
 study_area_map.add_raster("elevation", title="Elevation (m)")
 study_area_map.add_vector("soil_areas_sda", title="SSURGO Soil Polygons")
 study_area_map.show()
 ```
-
 
 ---
 
@@ -259,7 +283,8 @@ from io import StringIO
 
 with gs.RegionManager(raster="ksat_l_sda", s="s-275", flags="a"):
     tools.r_colors(
-        map=["ksat_l_sda", "ksat_r_sda", "ksat_h_sda"], rules=StringIO(ksat_color_scheme())
+        map=["ksat_l_sda", "ksat_r_sda", "ksat_h_sda"],
+        rules=StringIO(ksat_color_scheme()),
     )
     m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="ksat_l_sda", brighten=30)
@@ -745,7 +770,7 @@ tools.r_mapcalc(
 
 ```{python}
 # | label: runoff_calculation
-# tools.g_extension(extension="r.runoff", url="../../../cwhite911/grass-addons/src/raster/r.runoff")
+
 # Make sure you have the following GRASS addons installed
 # - r.accumulate
 # - r.runoff
@@ -954,7 +979,7 @@ Note: the `infil` parameter (Ksat-based infiltration of flowing water) is availa
 
 # 100yr storm running for 54.05 min with soil informed
 # Rainfall excess
-duration_min = 54.05
+duration_min = 54.05 ## Hardcoded for now, but could be derived from the Tc raster
 tools.r_slope_aspect(elevation="elevation", dx="dx", dy="dy")
 tools.r_sim_water(
     elevation="elevation",
@@ -1112,7 +1137,8 @@ For comparison, we run the same storm as a uniform rainfall rate applied equally
 # | label: r_sim_water_no_soil
 # | eval: false
 
-intensity_mm_hr = 101.937
+intensity_mm_hr = 101.937 # 100-year storm intensity at max Tc (54.05 min) from NOAA Atlas 14
+duration_min = 54.05  ## Hardcoded for now, but could be derived from the Tc raster
 tools.r_sim_water(
     elevation="elevation",
     depth="basic_depth",
@@ -1124,7 +1150,7 @@ tools.r_sim_water(
     # infil="ksat_r_sda", # Infiltration of flowing water
     niterations=duration_min,
     output_step=2,
-    nprocs=30,
+    nprocs=0,
     flags="t",
 )
 
@@ -1158,6 +1184,8 @@ gs.run_command(
 
 
 ```{python}
+# | label: basic_depth_map
+# | eval: true
 
 depth_list = gs.read_command(
     "g.list", type="raster", pattern="basic_depth.*", separator="comma"
@@ -1297,8 +1325,8 @@ shared_max = max(float(rx_stats["max"]), float(basic_stats["max"]))
 with gs.RegionManager(raster="accumulation", s="s-300", flags="a"):
     tools.r_colors(
         map=[basic_max, rx_max],
-        # color="water",
-        rules=io.StringIO(f"0% #ffffff\n100% #08306b\n"),
+        raster=basic_max,
+        flags="",
     )
 
     m1 = gj.Map(use_region=True, width=600)
@@ -1421,3 +1449,19 @@ The comparison above quantifies the practical value of soil-informed rainfall ex
 - The SCS curve-number method assumes a single antecedent moisture condition (AMC II). Wet or dry antecedent conditions would shift CN values and change runoff depths.
 - Ksat-based continuous infiltration (via the SIMWE `infil` parameter) could complement or replace the event-based CN approach for longer or multi-event simulations.
 - Comparing discharge (not just depth) between the two runs would further quantify the hydrologic impact of soil data on peak flow predictions.
+
+## GRASS Addons
+
+This notebook relies on several GRASS addon modules that extend the core functionality with soil data import, hydrologic modeling, and land-cover parameterization tools. Install them from the [GRASS Addons repository](https://github.com/OSGeo/grass-addons) using `g.extension`.
+
+| Addon | Description | Role in this notebook |
+|---|---|---|
+| [r.in.ssurgo](https://grass.osgeo.org/grass-devel/manuals/addons/r.in.ssurgo.html) | Import SSURGO soil data from SDA or local files | Imports hydrologic groups, Ksat, and soil polygons |
+| [r.curvenumber](https://grass.osgeo.org/grass-devel/manuals/addons/r.curvenumber.html) | SCS curve number from soil group and land cover | Produces the CN raster used to partition rainfall |
+| [r.runoff](https://grass.osgeo.org/grass-devel/manuals/addons/r.runoff.html) | SCS-CN runoff depth and peak discharge | Converts rainfall + CN into spatially varying runoff depth |
+| [r.accumulate](https://grass.osgeo.org/grass-devel/manuals/addons/r.accumulate.html) | Flow accumulation (dependency of r.runoff) | Traces flow paths for runoff routing |
+| [r.timeofconcentration](https://grass.osgeo.org/grass-devel/manuals/addons/r.timeofconcentration.html) | Watershed time of concentration | Determines design-storm duration |
+| [r.noaa.atlas14](https://grass.osgeo.org/grass-devel/manuals/addons/r.noaa.atlas14.html) | NOAA Atlas 14 precipitation frequency data | Provides IDF curves for the 100-year storm |
+| [r.manning](https://grass.osgeo.org/grass-devel/manuals/addons/r.manning.html) | Manning's n from land cover | Creates the surface-roughness input for SIMWE |
+| [r.stream.distance](https://grass.osgeo.org/grass-devel/manuals/addons/r.stream.distance.html) | Distance to and elevation above streams | Stream proximity analysis for Tc computation |
+| [r.stream.basins](https://grass.osgeo.org/grass-devel/manuals/addons/r.stream.basins.html) | Delineate basins from a stream network | Sub-basin delineation for hydrologic analysis |

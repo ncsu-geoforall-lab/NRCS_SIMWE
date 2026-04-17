@@ -186,3 +186,4 @@ data/*.zip
 app/
 *.3mf
 **/*.quarto_ipynb
+.remember

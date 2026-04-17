@@ -1,0 +1,34 @@
+[project]
+name = "nrcs-simwe"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests",
+    "jupyter",
+    "jupyterlab",
+    "notebook",
+    "ipykernel",
+    "ipywidgets",
+    "jupyterlab-widgets",
+    "widgetsnbextension",
+    "ipyleaflet",
+    "matplotlib",
+    "pandas",
+    "seaborn",
+    "scipy",
+    "SALib",
+    "pystac_client",
+    "tqdm",
+    "pyvista",
+    "trame",
+    "trame-vtk",
+    "trame-vuetify",
+    "pyvistaqt",
+    "pyqt5",
+    "nbformat",
+    "nbclient",
+    "papermill",
+    "pythreejs>=2.4.2",
+]

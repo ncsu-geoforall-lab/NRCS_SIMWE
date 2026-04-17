@@ -1,6 +1,7 @@
 ---
 jupyter: python3
 author: Corey T. White
+image: output/coweeta_ksat_r_sda.png
 execute:
   eval: true
   freeze: auto
@@ -143,22 +144,6 @@ tools.g_extension(
 
 ```
 
-::: {.panel-tabset}
-## Command Line
-
-```sh
-g.extension r.in.ssurgo
-```
-
-## Python (grass.tools)
-```python
-tools.g_extension(
-    extension="r.in.ssurgo"
-)
-```
-
-:::
-
 Set the computational region to the elevation raster and create a relief raster for hillshading.
 
 ```{python}
@@ -175,7 +160,7 @@ tools.r_relief(input="elevation", output="relief")
 
 Import SSURGO data using `r.in.ssurgo`. Note that this will import the soil areas map, hydrologic group map, and ksat maps for low, regular, and high values. The `mukey` column is also imported as a raster with a categorical color scheme applied. The hydrologic group map also has a categorical color scheme applied.
 
-::: {.panel-tabset}
+:::{.panel-tabset}
 
 ## Local Import
 
@@ -274,9 +259,6 @@ m.show()
 # |     - Low
 # |     - Regular
 # |     - High
-# |     - Low - SDA
-# |     - Regular - SDA
-# |     - High - SDA
 
 
 # m = gj.Map(use_region=True)
@@ -295,17 +277,17 @@ m.show()
 # m.show()
 
 m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_l_sda")
+m.d_shade(shade="relief", color="ksat_l_sda", brighten=30)
 m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_r_sda")
+m = gj.Map(use_region=True, filename="output/coweeta_ksat_r_sda.png")
+m.d_shade(shade="relief", color="ksat_r_sda", brighten=30)
 m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 
 m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_h_sda")
+m.d_shade(shade="relief", color="ksat_h_sda", brighten=30)
 m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="db")
 m.show()
 ```
@@ -475,19 +457,8 @@ tools.g_extension(
 ```{python}
 # | label: noaa_atlas14
 
-tools.r_noaa_atlas14(
-    mode="grid",
-    statistic="intensity",
-    unit="metric",
-    series="pds",
-    bound="expected",
-    resample="bilinear",
-    flags="i",
-    region="se",
-    # base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
-)
-# | Latitude | 35.0667° |
-# | Longitude | -83.4333° |
+# Point query at the Coweeta study location (lon, lat) — avoids the multi-GB
+# regional grid download that mode="grid" triggers.
 outjson = tools.r_noaa_atlas14(
     mode="point",
     statistic="intensity",
@@ -497,9 +468,6 @@ outjson = tools.r_noaa_atlas14(
     series="pds",
     bound="expected",
     resample="bilinear",
-    # flags="i",
-    # region="se",
-    # base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
 ).json
 ```
 
@@ -957,7 +925,7 @@ Rainfall excess map
 
 # Time of Concentration: 46.8 min
 tools.r_mapcalc(
-    expression=f"rainfall_excess = runoff_depth / 24.0",
+    expression=f"rainfall_excess = runoff_depth / 24.0", # TODO divide by correct time in hours based on time of concentration
 )
 
 
@@ -1122,6 +1090,208 @@ m.show()
 ![Overland Flow Simulation with Soil Data](output/tc_100yr_simwe_depth_animation.gif)
 
 Overland Flow Simulation (100yr - 12hr storm) with Soil Data
+
+### Walker Velocity Animation
+
+The `walkers_output` from `r.sim.water` stores walker positions but no velocity attribute. SIMWE already emits both depth ($h$) and unit discharge ($q$) per timestep, and by definition $q = h \cdot v$, so the per-cell flow speed is simply $v = q / h$. Using SIMWE's own outputs keeps the velocity field consistent with the model's internal physics (diffusion wave + Manning + infiltration) rather than re-deriving it from Manning's equation externally. We then sample this velocity raster at each walker position to color the Lagrangian particle cloud.
+
+```{python}
+# | label: compute_velocity_rasters
+# | eval: false
+# Build an STRDS of per-timestep flow-speed rasters directly from SIMWE's own
+# discharge and depth outputs: v = q / h.  This stays self-consistent with the
+# model's internal physics (diffusion-wave + Manning + infiltration) rather
+# than re-deriving velocity from Manning's equation externally.
+
+depth_list = gs.read_command(
+    "g.list", type="raster", pattern="tc_100yr_depth.*", separator=","
+).strip().split(",")
+
+vel_list = []
+for depth in depth_list:
+    suffix = depth.split(".", 1)[1]
+    discharge = f"tc_100yr_discharge.{suffix}"
+    vel = f"tc_100yr_velocity.{suffix}"
+    tools.r_mapcalc(
+        expression=(
+            f"{vel} = if({depth} > 0.001, {discharge} / {depth}, null())"
+        ),
+        overwrite=True,
+    )
+    vel_list.append(vel)
+
+gs.run_command(
+    "t.create", output="tc_100yr_velocity_sum", type="strds",
+    temporaltype="absolute", title="Overland Flow Velocity",
+    description="Flow speed (m/s) from SIMWE discharge / depth", overwrite=True,
+)
+gs.run_command(
+    "t.register", input="tc_100yr_velocity_sum", type="raster",
+    start="2024-01-01", increment="2 minutes",
+    maps=",".join(vel_list), flags="i", overwrite=True,
+)
+gs.run_command(
+    "t.rast.colors", input="tc_100yr_velocity_sum", color="blues", flags="e",
+)
+```
+
+```{python}
+# | label: walker_stvds
+# | eval: false
+# Subsample walker vectors, attach an attribute table with a velocity column
+# sampled from the v = q/h raster for the matching timestep,
+# store a per-walker color via v.colors, and register an STVDS.
+
+# Walker maps: tc_100yr_walkers_02, _04, ...  Velocity rasters: tc_100yr_velocity.02, .04, ...
+walker_maps = (
+    gs.read_command(
+        "g.list", type="vector", pattern="tc_100yr_walkers_*", separator=","
+    )
+    .strip()
+    .split(",")
+)
+
+step = 50  # keep every Nth walker
+
+sampled = []
+for wm in walker_maps:
+    suffix = wm.rsplit("_", 1)[1]  # "02"
+    print(f"Processing walker map {wm} with suffix {suffix}")
+    vel_raster = f"tc_100yr_velocity.{suffix}"
+    s = f"{wm}_sub"
+
+    # Walker vectors have no attribute table, so `where=` SQL is unavailable.
+    # Get the point count from v.info and pass an explicit cats list instead.
+    vinfo = gs.parse_command("v.info", map=wm, flags="t")
+    n_points = int(vinfo.get("points", 0))
+    cats = ",".join(str(c) for c in range(1, n_points + 1, step))
+    print(f"Processing {wm} ({n_points} pts -> {n_points // step} sampled)")
+
+    gs.run_command(
+        "v.extract",
+        input=wm,
+        output=s,
+        cats=cats,
+        overwrite=True,
+    )
+
+    layers = gs.parse_command(
+        "v.db.connect", map=s, flags="p", format="csv"
+    )
+
+    if not layers:
+        print(f"Warning: no attribute table found for {s}, creating one with cats only")
+        gs.run_command(
+            "v.db.addtable",
+            map=s,
+            columns="velocity double precision, GRASSRGB varchar(11)",
+            overwrite=True,
+        )
+    gs.run_command(
+        "v.what.rast",
+        map=s,
+        raster=vel_raster,
+        column="velocity",
+    )
+    gs.run_command(
+        "v.colors",
+        map=s,
+        use="attr",
+        column="velocity",
+        color="blues",
+        rgb_column="GRASSRGB",
+    )
+    sampled.append(s)
+
+gs.run_command(
+    "t.create",
+    output="tc_100yr_walkers_stvds",
+    type="stvds",
+    temporaltype="absolute",
+    title="Walker Positions (2% sample)",
+    description="Subsampled Lagrangian walker particles with velocity attribute",
+    overwrite=True,
+)
+
+# SIMWE uses adaptive timestepping, so the output suffixes aren't on a uniform
+# 2-min grid (e.g. _10, _11, _13). Register with an explicit file of
+# map|start|end rows derived from the suffix so STVDS granularity is well-defined.
+import tempfile
+
+ordered = sorted(sampled, key=lambda s: int(s.split("_")[-2]))
+starts = [int(s.split("_")[-2]) for s in ordered]
+
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+    for i, s in enumerate(ordered):
+        t_start = starts[i]
+        t_end = starts[i + 1] if i + 1 < len(starts) else t_start + 2
+        start_ts = f"2024-01-01 {t_start // 60:02d}:{t_start % 60:02d}:00"
+        end_ts = f"2024-01-01 {t_end // 60:02d}:{t_end % 60:02d}:00"
+        f.write(f"{s}|{start_ts}|{end_ts}\n")
+    register_file = f.name
+
+gs.run_command(
+    "t.register",
+    input="tc_100yr_walkers_stvds",
+    type="vector",
+    file=register_file,
+    overwrite=True,
+)
+gs.run_command("t.support", input="tc_100yr_walkers_stvds", type="stvds", flags="u")
+print(gs.read_command("t.info", input="tc_100yr_walkers_stvds", type="stvds"))
+```
+
+```{python}
+# | label: walker_velocity_animation
+# | eval: false
+
+# Walkers are colored by their per-timestep velocity via the GRASSRGB column.
+# A final-timestep velocity raster is shown only to drive the legend's scale.
+with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
+    vel_list = (
+        gs.read_command(
+            "g.list", type="raster", pattern="tc_100yr_velocity.*", separator=","
+        )
+        .strip()
+        .split(",")
+    )
+    vmax = tools.r_info(map=vel_list[-1], format="json").json["max"]
+
+    m = gj.TimeSeriesMap(use_region=True, width=600)
+    m.d_shade(shade="relief", color="naip_2022_rgb@naip")
+    m.add_vector_series(
+        "tc_100yr_walkers_stvds",
+        rgb_column="GRASSRGB",
+        icon="basic/circle",
+        size=2,
+    )
+    m.d_legend(
+        raster=vel_list[-1],
+        title="Velocity (m/s)",
+        flags="bt",
+        border_color="none",
+        fontsize=14,
+        range=[0.01, vmax],
+        at=(8, 12, 15, 85),
+    )
+
+    m.d_barscale(
+        at=(20, 28),
+        font="Fira Sans Condensed Light",
+        fontsize=10,
+        length=3,
+        width_scale=1,
+        units="kilometers",
+        bgcolor="none",
+        style="both_ticks",
+        color="#f7f7f7",
+        flags="n",
+    )
+    m.save("output/tc_100yr_walker_velocity_animation.gif")
+    display(m.show())
+```
+
+![Walker positions colored by SIMWE flow speed ($v = q/h$)](output/tc_100yr_walker_velocity_animation.gif)
 
 ```{python}
 # | label: depth_map

@@ -4,7 +4,7 @@ project:
   output-dir: docs
 website:
   navbar:
-    title: "NCSU GeoForAll Lab SIMWE - NRCS"
+    title: "SIMWE Soils Project"
     background: primary
     search: true
     left:

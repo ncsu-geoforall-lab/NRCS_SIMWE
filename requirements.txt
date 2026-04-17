@@ -1,11 +1,11 @@
 requests
+jupyter
 matplotlib
 pandas
 ipywidgets
 pystac_client
 tqdm
 ipyleaflet
-folium
 pandas
 seaborn
 scipy
