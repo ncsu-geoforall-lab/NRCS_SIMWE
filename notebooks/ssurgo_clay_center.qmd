@@ -82,22 +82,88 @@ finally:
     session.switch_mapset(mapset)
 ```
 
+```{python}
+# | label: study_area_map
+# | echo: false
+# | fig-cap: "Study area near Clay Center, Kansas. The elevation raster is shown over an OpenStreetMap basemap for geographic context."
+from ipyleaflet import Map, Marker
+
+region = gs.parse_command("g.region", raster="elevation", flags="pg")
+
+study_area_map = gj.InteractiveMap(
+    width=720,
+    height=480,
+    use_region=True,
+)
+study_area_map.map.add(Marker(location=(39.4003765, -97.0630433), title="Clay Center"))
+study_area_map.add_raster("elevation", title="Elevation (m)")
+study_area_map.add_vector("soil_areas_sda", title="SSURGO Soil Polygons")
+study_area_map.show()
+```
+
+
 ---
 
 ### Computational Region
 
-We align the computational region to the 10 m elevation raster and create a hillshade for cartographic context beneath the soil and runoff maps that follow.
+We align the computational region to the 3 m elevation raster and create a hillshade for cartographic context beneath the soil and runoff maps that follow.
 
 ```{python}
 # | label: set_region
-region_text = tools.g_region(raster="elevation", flags="pac").text
-print(region_text)
+# | echo: false
+
+region = gs.parse_command("g.region", raster="elevation", flags="pg")
+
+labels = {
+    "n": "North", "s": "South", "e": "East", "w": "West",
+    "nsres": "N-S Resolution", "ewres": "E-W Resolution",
+    "rows": "Rows", "cols": "Columns", "cells": "Total Cells",
+}
+
+region_df = pd.DataFrame(
+    [(labels.get(k, k), f"{float(v):,.1f}" if "." in v else f"{int(v):,}")
+     for k, v in region.items() if k in labels],
+    columns=["Parameter", "Value"],
+)
+
+display(
+    region_df.style
+    .hide(axis="index")
+    .set_caption("Computational Region")
+)
 ```
 
-Let's also create a relief raster for hillshading or soil maps.
+```{python}
+# | label: create_relief
+tools.r_relief(input="elevation", output="relief")
+```
 
 ```{python}
-tools.r_relief(input="elevation", output="relief")
+# | label: study_area_detail
+# | echo: false
+# | fig-cap: "Detailed view of the study area showing NAIP 2021 aerial imagery draped over a hillshade with the SSURGO soil polygon boundaries."
+
+with gs.RegionManager(raster="elevation", s="s-300", flags="a"):
+    m = gj.Map(use_region=True, width=700)
+    m.d_shade(shade="relief", color="naip_2021_rgb@naip")
+    # m.d_vect(
+    #     map="soil_areas_sda",
+    #     color="#7b6a1e",
+    #     fillcolor="none",
+    #     width=1,
+    # )
+    m.d_barscale(
+        at=(67, 5),
+        font="Fira Sans Condensed Light",
+        fontsize=12,
+        length=500,
+        unit="meters",
+        width_scale=1,
+        bgcolor="none",
+        color="#1c1c1c",
+        flags="n",
+    )
+    m.show()
 ```
 
 ## Importing SSURGO Soil Data
