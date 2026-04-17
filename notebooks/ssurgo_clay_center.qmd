@@ -229,10 +229,26 @@ We can visualize the hydrologic group maps to compare the local and SDA imports.
 # | echo: false
 # | fig-cap: "Hydrologic groups"
 
-with gs.RegionManager(raster="hydgrp_sda", s="s-50000", flags="a"):
-    m = gj.Map(use_region=False)
+with gs.RegionManager(raster="hydgrp_sda", s="s-300", flags="a"):
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="hydgrp_sda")
-    m.d_legend(raster="hydgrp_sda", flags="bn", at="10, 30, 50, 80")
+    m.d_legend(
+        raster="hydgrp_sda",
+        flags="cbn",
+        at="2,12,5,15",
+        title="Hydrologic Group",
+    )
+    m.d_barscale(
+        at=(67, 5),
+        font="Fira Sans Condensed Light",
+        fontsize=12,
+        length=250,
+        unit="meters",
+        width_scale=1,
+        bgcolor="none",
+        color="#4f4e4e",
+        flags="n",
+    )
     m.show()
 ```
 
@@ -393,9 +409,9 @@ tools.r_timeofconcentration(
 # | fig-cap: "Time of concentration derived from the elevation raster using r.timeofconcentration."
 # | fig-subcap:
 # |     - Time of Concentration
-with gs.RegionManager(raster="elevation", s="s-300", flags="a"):
+with gs.RegionManager(raster="elevation", s="s-250", flags="a"):
     tools.r_colors(map="time_concentration", color="byg", flags="e")
-    m = gj.Map(use_region=True)
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="time_concentration")
 
     m.d_legend(
@@ -407,7 +423,7 @@ with gs.RegionManager(raster="elevation", s="s-300", flags="a"):
         flags="s",
     )
     m.d_barscale(
-        at=(60, 30),
+        at=(68, 28),
         font="Fira Sans Condensed Light",
         fontsize=10,
         length=250,
@@ -415,7 +431,7 @@ with gs.RegionManager(raster="elevation", s="s-300", flags="a"):
         width_scale=1,
         bgcolor="none",
         # style="both_ticks",
-        color="#4f4c4c",
+        color="#1c1c1c",
         flags="n",
     )
     m.show()
@@ -743,7 +759,7 @@ We will calculate the Manning's n map using the `r.manning` extension, which use
 Now we can calculate the roughness map using the `r.manning` tool.
 
 ```{python}
-# | label: r_manning_map
+# | label: mannings_n
 tools.r_manning(
     input="nlcd_2024",
     output="mannings_n",
@@ -751,11 +767,32 @@ tools.r_manning(
     source="kalyanapu",
     seed=42,
 )
+```
 
+```{python}
+# | label: r_manning_map
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: Manning's n map derived from the NLCD 2024 land cover map using the r.manning tool with the Kalyanapu et al. (2009) lookup table.
+# | fig-subcap:
+# |     - Manning's n
 
-with gs.RegionManager(raster="mannings_n", s="s-200", flags="a"):
-    tools.r_colors(map="mannings_n", color="plasma", flags="")
-    m = gj.Map(use_region=True)
+mannings_n_colors = io.StringIO(
+"0.008 #F0E68C\n"   # Barren Land (low end)
+"0.025 #6BAED6\n"   # Open Water
+"0.040 #A1D99B\n"   # Developed, Open Space / Open Water (med)
+"0.068 #BDBDBD\n"   # Developed, Low/Med Intensity
+"0.160 #F4A460\n"   # Cultivated Crops
+"0.183 #66C2A4\n"   # Emergent Herbaceous Wetlands
+"0.325 #D4B86A\n"   # Pasture/Hay
+"0.368 #A8C25C\n"   # Grassland/Herbaceous
+"0.400 #2D8C2D\n"   # Mixed Forest / Shrub
+"0.530 #1A5C1A\n"   # Dense Forest (high end)
+)
+
+with gs.RegionManager(raster="mannings_n", s="s-250", flags="a"):
+    tools.r_colors(map="mannings_n", rules=mannings_n_colors)
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="mannings_n")
 
     m.d_legend(
@@ -763,21 +800,22 @@ with gs.RegionManager(raster="mannings_n", s="s-200", flags="a"):
         at="8, 12, 20, 80",
         title="Manning's n",
         font="Fira Sans Condensed Light",
-        fontsize=14,
-        flags="",
+        fontsize=16,
+        flags="s",
     )
     m.d_barscale(
-        at=(20, 28),
+        at=(67, 25),
         font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
+        fontsize=12,
+        length=250,
+        unit="meters",
         width_scale=1,
-        units="kilometers",
         bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        # style="both_ticks",
+        color="#ffffff",
         flags="n",
     )
+
     m.show()
 ```
 
@@ -799,49 +837,49 @@ We will use a constant rainfall value for the simulation, which is based on an 1
 | Elevation | ft** |
 <!-- ![Coweeta Hydrologic Lab](data/coweeta_exp_stn.png) -->
 
-Rainfall excess map
+Convert runoff_depth (mm) to rainfall excess. during a 54 min 100 year storm. So the runoff depth (m) is divided by 0.9 hours (54 min) to get the rainfall excess in mm/hr. The 0.9 hours is derived from the duration of the storm, which is 54 minutes, converted to hours (54/60 = 0.9). This gives us the average rainfall excess rate in mm/hr over the duration of the storm.
+
+Runoff depth per cell [mm] is calculated by the SCS-CN method.
+
+```{python}
+# | label: rainfall_excess_calc
+tools.r_mapcalc(
+    expression=f"rainfall_excess = runoff_depth / 0.9",
+)
+```
 
 ```{python}
 # | label: rainfall_excess_map
 
-# Convert runoff_depth (mm) to rainfall excess. during a 54 min 100 year storm. So the runoff depth (m) is divided by 0.9 hours (54 min) to get the rainfall excess in mm/hr. The 0.9 hours is derived from the duration of the storm, which is 54 minutes, converted to hours (54/60 = 0.9). This gives us the average rainfall excess rate in mm/hr over the duration of the storm.
-# Runoff depth per cell [mm] is calculated by the SCS-CN method.
 
-
-tools.r_mapcalc(
-    expression=f"rainfall_excess = runoff_depth / 0.9",
-)
-
-
-with gs.RegionManager(raster="rainfall_excess", s="s-200", flags="a"):
-    tools.r_colors(map="rainfall_excess", color="blue", flags="e")
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="rainfall_excess", s="s-250", flags="a"):
+    tools.r_colors(map="rainfall_excess", color="water", flags="e")
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="rainfall_excess")
-
     m.d_legend(
         raster="rainfall_excess",
-        title="Rainfall Excess (mm/hr)",
         at="8, 12, 20, 80",
+        title="Rainfall Excess (mm/hr)",
         font="Fira Sans Condensed Light",
-        fontsize=14,
-        flags="",
+        fontsize=16,
+        flags="s",
     )
     m.d_barscale(
-        at=(20, 28),
+        at=(67, 25),
         font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
+        fontsize=12,
+        length=250,
+        unit="meters",
         width_scale=1,
-        units="kilometers",
         bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        # style="both_ticks",
+        color="#ffffff",
         flags="n",
     )
     m.show()
 ```
 
-Calcuate the overland flow for a 47 min 100 year storm using the `r.sim.water` tool, which simulates overland flow using a particle-based approach. The tool requires the elevation raster, rainfall excess raster, and Manning's n raster as inputs, along with the number of walkers to simulate and the number of iterations to run. The output is a series of depth and discharge rasters that can be visualized as maps or animations.
+Calcuate the overland flow for a 54 min 100 year storm using the `r.sim.water` tool, which simulates overland flow using a particle-based approach. The tool requires the elevation raster, rainfall excess raster, and Manning's n raster as inputs, along with the number of walkers to simulate and the number of iterations to run. The output is a series of depth and discharge rasters that can be visualized as maps or animations.
 
 ```{python}
 # | label: r_sim_water
@@ -899,6 +937,8 @@ gs.run_command(
 
 ```{python}
 # | label: rx_depth_sum_info
+# | echo: false
+# | display: false
 
 tools.t_info(input="rx_100yr_depth_sum")
 ```
@@ -906,6 +946,7 @@ tools.t_info(input="rx_100yr_depth_sum")
 ```{python}
 # | label: rx_100yr_depth_map
 # | eval: true
+# | fig-cap: "Runoff depth map derived from the r.sim.water tool for a 100-year storm with soil data, visualized at the last outputed time step."
 
 depth_list = gs.read_command(
     "g.list", type="raster", pattern="rx_100yr_depth.*", separator="comma"
@@ -913,29 +954,54 @@ depth_list = gs.read_command(
 
 max_depth = depth_list.split(",")[-1]
 stats = tools.r_info(map=max_depth, format="json").json
-with gs.RegionManager(raster="accumulation", s="s-200", flags="a"):
-    m = gj.Map(use_region=True)
+
+def parse_simwe_comments(comments: str) -> pd.DataFrame:
+    params = {}
+    for line in comments.strip().splitlines():
+        for part in line.split(","):
+            part = part.strip()
+            if "=" in part:
+                k, v = part.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"')
+                try:
+                    v = float(v) if "." in v or "e" in v.lower() else int(v)
+                except ValueError:
+                    pass
+                params[k] = v
+    return (
+        pd.DataFrame(list(params.items()), columns=["Parameter", "Value"])
+    )
+
+display(
+    parse_simwe_comments(stats["comments"])
+    .style.hide(axis="index")
+    .set_caption(f"r.sim.water run summary — {max_depth}")
+)
+
+with gs.RegionManager(raster="accumulation", s="s-300", flags="a"):
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="naip_2021_rgb@naip")
-    m.d_rast(map=max_depth, values=f"0.005-{stats['max']}")
+    m.d_rast(map=max_depth, values=f"0.025-{stats['max']}")
     m.d_legend(
         raster=max_depth,
-        title="Deqpth [m]",
-        at="8, 12, 15, 85",
+        at="8, 12, 20, 80",
+        title="Depth [m]",
         font="Fira Sans Condensed Light",
-        range=[0.005, stats["max"]],
-        fontsize=14,
-        flags="",
+        range=[0.025, stats["max"]],
+        fontsize=16,
+        flags="s",
     )
     m.d_barscale(
-        at=(20, 28),
+        at=(67, 19),
         font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
+        fontsize=12,
+        length=250,
+        unit="meters",
         width_scale=1,
-        units="kilometers",
         bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        # style="both_ticks",
+        color="#4f4e4e",
         flags="n",
     )
     m.show()
@@ -949,20 +1015,32 @@ Animation of depth maps
 
 max_depth = depth_list.split(",")[-1]
 stats = tools.r_info(map=max_depth, format="json").json
-m = gj.TimeSeriesMap(use_region=True, width=800)
-m.d_rast(map="naip_2021_rgb@naip")
-m.add_raster_series("rx_100yr_depth_sum", values=f"0.005-{stats['max']}")
-m.d_legend(
-    raster=max_depth,
-    title="Depth [m]",
-    flags="bt",
-    border_color="none",
-    range=[0.005, stats["max"]],
-    at=(1, 50, 0, 5),
-)
+with gs.RegionManager(raster="accumulation", s="s-300", flags="a"):
+    m = gj.TimeSeriesMap(use_region=True, width=800)
+    m.d_rast(map="naip_2021_rgb@naip")
+    m.add_raster_series("rx_100yr_depth_sum", values=f"0.005-{stats['max']}")
+    m.d_legend(
+        raster=max_depth,
+        title="Depth [m]",
+        flags="bt",
+        border_color="none",
+        range=[0.005, stats["max"]],
+        at="8, 12, 20, 80",
+    )
+    m.d_barscale(
+        at=(67, 19),
+        font="Fira Sans Condensed Light",
+        fontsize=12,
+        length=250,
+        unit="meters",
+        width_scale=1,
+        bgcolor="none",
+        color="#4f4e4e",
+        flags="n",
+    )
 
-m.save("output/clay_center_rx_100yr_simwe_depth_animation.gif")
-m.show()
+    m.save("output/clay_center_rx_100yr_simwe_depth_animation.gif")
+    m.show()
 ```
 
 ![Overland Flow Simulation with Soil Data](output/clay_center_rx_100yr_simwe_depth_animation.gif)
@@ -1019,6 +1097,7 @@ gs.run_command(
 
 ```{python}
 # | label: basic_depth_sum_info
+# | echo: false
 
 tools.t_info(input="basic_depth_sum")
 ```
@@ -1031,17 +1110,30 @@ depth_list = gs.read_command(
 
 basic_max_depth = depth_list.split(",")[-1]
 stats = tools.r_info(map=basic_max_depth, format="json").json
-with gs.RegionManager(raster="accumulation", s="s-200", flags="a"):
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="accumulation", s="s-300", flags="a"):
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="naip_2021_rgb@naip")
-    m.d_rast(map=basic_max_depth, values=f"0.005-{stats['max']}")
+    m.d_rast(map=basic_max_depth, values=f"0.025-{stats['max']}")
     m.d_legend(
         raster=basic_max_depth,
+        at="8, 12, 20, 80",
         title="Depth [m]",
-        flags="btl",
-        border_color="none",
-        range=[0.005, stats["max"]],
-        at=(5, 50, 2, 5),
+        font="Fira Sans Condensed Light",
+        range=[0.025, stats["max"]],
+        fontsize=16,
+        flags="s",
+    )
+    m.d_barscale(
+        at=(67, 19),
+        font="Fira Sans Condensed Light",
+        fontsize=12,
+        length=250,
+        unit="meters",
+        width_scale=1,
+        bgcolor="none",
+        # style="both_ticks",
+        color="#4f4e4e",
+        flags="n",
     )
     m.show()
 ```
@@ -1053,19 +1145,32 @@ no soil animation
 # | eval: false
 basic_max_depth = depth_list.split(",")[-1]
 stats = tools.r_info(map=basic_max_depth, format="json").json
-m = gj.TimeSeriesMap(use_region=True, width=800)
-m.d_rast(map="naip_2021_rgb@naip")
-m.add_raster_series("basic_depth_sum", values=f"0.005-{stats['max']}")
-m.d_legend(
-    raster=basic_max_depth,
-    title="Depth [m]",
-    flags="bt",
-    border_color="none",
-    range=[0.005, stats["max"]],
-    at=(1, 50, 0, 5),
-)
-m.save("output/clay_center_basic_depth_simwe_depth_animation.gif")
-m.show()
+with gs.RegionManager(raster="accumulation", s="s-300", flags="a"):
+    m = gj.TimeSeriesMap(use_region=True, width=800)
+    m.d_rast(map="naip_2021_rgb@naip")
+    m.add_raster_series("basic_depth_sum", values=f"0.005-{stats['max']}")
+    m.d_legend(
+        raster=basic_max_depth,
+        title="Depth [m]",
+        flags="bt",
+        border_color="none",
+        range=[0.005, stats["max"]],
+        at="8, 12, 20, 80",
+    )
+    m.d_barscale(
+        at=(67, 19),
+        font="Fira Sans Condensed Light",
+        fontsize=12,
+        length=250,
+        unit="meters",
+        width_scale=1,
+        bgcolor="none",
+        # style="both_ticks",
+        color="#4f4e4e",
+        flags="n",
+    )
+    m.save("output/clay_center_basic_depth_simwe_depth_animation.gif")
+    m.show()
 ```
 
 ![Overland Flow Simulation without Soil Data](output/clay_center_basic_depth_simwe_depth_animation.gif)
