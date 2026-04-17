@@ -35,6 +35,8 @@ This notebook demonstrates how to import SSURGO soil data into GRASS using the [
 import os
 import subprocess
 import sys
+import io
+import textwrap
 
 # import numpy as np
 import matplotlib.pyplot as plt
@@ -120,7 +122,7 @@ tools.r_in_ssurgo(
 The tool imports the soil polygons as a vector map (`soil_areas_sda`), which contains the soil polygons with attributes from the SSURGO database.
 
 ```{python}
-# | label: SDA soil attributes
+# | label: SDA-soil-attributes
 # | echo: false
 
 json_data = tools.v_db_select(map="soil_areas_sda", format="json").json
@@ -256,15 +258,42 @@ NLCD 2024 land cover map:
 
 ```{python}
 # | label: landcover_map
-with gs.RegionManager(raster="nlcd_2024", w="w-1600", flags="a"):
+# | layout-ncol: 1
+# | echo: false
+# | fig-cap: "Land cover map derived from the NLCD 2024 dataset."
+# | fig-subcap:
+# |     - Land Cover
+with gs.RegionManager(raster="nlcd_2024", w="w-1200", flags="a"):
+    tools.r_category(
+        map="nlcd_2024",
+        separator="|",
+        rules=io.StringIO(
+            "11|Open Water\n"
+            "12|Perennial Ice/Snow\n"
+            "21|Developed, Open Space\n"
+            "22|Developed, Low Intensity\n"
+            "23|Developed, Medium Intensity\n"
+            "24|Developed, High Intensity\n"
+            "31|Barren Land\n"
+            "41|Deciduous Forest\n"
+            "42|Evergreen Forest\n"
+            "43|Mixed Forest\n"
+            "52|Shrub/Scrub\n"
+            "71|Grassland/Herbaceous\n"
+            "81|Pasture/Hay\n"
+            "82|Cultivated Crops\n"
+            "90|Woody Wetlands\n"
+            "95|Emergent Herbaceous Wetlands\n"
+        ),
+    )
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="nlcd_2024")
     m.d_legend(
         raster="nlcd_2024",
-        title="NLCD 2024",
-        flags="",
-        at="5,80,2,45",
-        fontsize=12,
+        font="Fira Sans Condensed Light",
+        flags="n",
+        at="5,85,2,20",
+        fontsize=14,
     )
     m.show()
 ```
@@ -282,12 +311,22 @@ tools.r_curvenumber(
 ```
 
 ```{python}
-#| label: curvenumber_map
-
-with gs.RegionManager(raster="curvenumber", w="w-1600", flags="a"):
+# | label: curvenumber_map
+# | layout-ncol: 1
+# | echo: false
+# | fig-cap: "Curve number map derived from the NLCD 2024 dataset and hydrologic soil group map."
+# | fig-subcap:
+# |     - Curve Number
+with gs.RegionManager(raster="curvenumber", s="s-275", flags="a"):
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="curvenumber")
-    m.d_legend(raster="curvenumber", title="Curve Number", flags="s", at="5, 30, 2, 10", fontsize=12)
+    m.d_legend(
+        raster="curvenumber",
+        title="Curve Number",
+        flags="",
+        at="8, 12, 20, 80",
+        fontsize=12,
+    )
     m.show()
 ```
 
@@ -305,34 +344,34 @@ tools.r_watershed(
     accumulation="accumulation",
     stream="stream",
     basin="basins",
-    threshold=10,
+    threshold=1000,
 )
 ```
 
 ```{python}
 # | label: watershed_map
+# | layout-ncol: 2
+# | echo: false
+# | fig-cap: "Flow accumulation and basins derived from the elevation raster using r.watershed with a 1000 cell threshold."
+# | fig-subcap:
+# |     - Flow Accumulation
+# |     - Basins (1000 cell threshold)
 
-with gs.RegionManager(raster="accumulation", w="w-1600", flags="a"):
+with gs.RegionManager(raster="accumulation", s="s-275", flags="a"):
+    univar_stats = tools.r_univar(map="accumulation", format="json").json
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="accumulation")
     m.d_legend(
         raster="accumulation",
-        title="Accumulation",
+        title="Cell Count",
+        at="8, 12, 20, 80",
+        range=f"0, {univar_stats['max']}",
         flags="s",
-        at="5, 30, 2, 10",
-        fontsize=12,
     )
     m.show()
 
     m2 = gj.Map(use_region=True)
     m2.d_shade(shade="relief", color="basins")
-    m2.d_legend(
-        raster="basins",
-        title="Basins 50K threshold",
-        flags="s",
-        at="5, 30, 2, 10",
-        fontsize=12,
-    )
     m2.show()
 ```
 
@@ -344,15 +383,17 @@ tools.r_timeofconcentration(
     elevation="elevation",
     direction="flow_direction",
     stream="stream",
-    length_min=1,  # minimum length of flow path
+    length_min=100,  # minimum length of flow path
     tc="time_concentration",
 )
 ```
 
 ```{python}
 # | label: time_of_concentration_map
-
-with gs.RegionManager(raster="elevation", s="s-200", flags="a"):
+# | fig-cap: "Time of concentration derived from the elevation raster using r.timeofconcentration."
+# | fig-subcap:
+# |     - Time of Concentration
+with gs.RegionManager(raster="elevation", s="s-300", flags="a"):
     tools.r_colors(map="time_concentration", color="byg", flags="e")
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="time_concentration")
@@ -366,15 +407,15 @@ with gs.RegionManager(raster="elevation", s="s-200", flags="a"):
         flags="s",
     )
     m.d_barscale(
-        at=(20, 28),
+        at=(60, 30),
         font="Fira Sans Condensed Light",
         fontsize=10,
-        length=3,
+        length=250,
+        unit="meters",
         width_scale=1,
-        units="kilometers",
         bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        # style="both_ticks",
+        color="#4f4c4c",
         flags="n",
     )
     m.show()
@@ -421,330 +462,22 @@ display(
 
 ## NOAA Atlas Precipitation Frequency
 
-```{python}
-# | label: noaa-import-func
-# | echo: false
-from __future__ import annotations
-
-import csv
-import io
-import re
-from typing import Any, Literal
-
-
-class PFDSParseError(Exception):
-    """Raised when a PFDS response cannot be parsed."""
-
-
-BoundType = Literal["expected", "upper", "lower", "all"]
-OutputType = Literal["json", "csv"]
-
-
-def fetch_pfds_table(
-    lat: float,
-    lon: float,
-    data: Literal["depth", "intensity"] = "intensity",
-    units: Literal["metric", "english"] = "metric",
-    series: Literal["pds", "ams"] = "pds",
-    timeout: int = 30,
-    session: Any | None = None,
-) -> tuple[str, dict[str, Any]]:
-    import requests
-
-    valid_data = {"depth", "intensity"}
-    valid_units = {"metric", "english"}
-    valid_series = {"pds", "ams"}
-
-    if data not in valid_data:
-        raise ValueError(f"data must be one of {sorted(valid_data)}")
-    if units not in valid_units:
-        raise ValueError(f"units must be one of {sorted(valid_units)}")
-    if series not in valid_series:
-        raise ValueError(f"series must be one of {sorted(valid_series)}")
-
-    url = "https://hdsc.nws.noaa.gov/cgi-bin/new/fe_text.csv"
-    params = {
-        "lat": lat,
-        "lon": lon,
-        "data": data,
-        "units": units,
-        "series": series,
-    }
-
-    http = session or requests
-    resp = http.get(url, params=params, timeout=timeout)
-    resp.raise_for_status()
-
-    request_info = {
-        "lat": lat,
-        "lon": lon,
-        "data": data,
-        "units": units,
-        "series": series,
-        "url": resp.url,
-    }
-    return resp.text, request_info
-
-
-def parse_pfds_table(
-    text: str,
-    request: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """
-    Parse PFDS response into structured sections:
-      - expected
-      - upper
-      - lower
-    """
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        raise PFDSParseError("Empty PFDS response.")
-
-    result: dict[str, Any] = {
-        "request": request or {},
-        "metadata": {},
-        "tables": {
-            "expected": {"return_periods_years": [], "rows": []},
-            "upper": {"return_periods_years": [], "rows": []},
-            "lower": {"return_periods_years": [], "rows": []},
-        },
-    }
-
-    current_section = "expected"
-    current_return_periods: list[int | float | str] | None = None
-
-    for line in lines:
-        low = line.lower()
-
-        # Section switches
-        if "upper bound of 90% confidence interval" in low:
-            current_section = "upper"
-            current_return_periods = None
-            continue
-
-        if "lower bound of 90% confidence interval" in low:
-            current_section = "lower"
-            current_return_periods = None
-            continue
-
-        # Skip footer/runtime lines
-        if low.startswith("date/time"):
-            continue
-        if low.startswith("pyruntime"):
-            continue
-
-        # Capture metadata before data table starts
-        if current_section == "expected" and current_return_periods is None:
-            m = re.match(r"^\s*([^=,:]+?)\s*[:=]\s*(.+?)\s*$", line)
-            if m and not low.startswith("by duration for ari"):
-                key = re.sub(r"\s+", "_", m.group(1).strip().lower())
-                result["metadata"][key] = m.group(2).strip()
-
-        # Header row like: by duration for ARI (years):,1,2,5,...
-        if low.startswith("by duration for ari"):
-            row = next(csv.reader([line]))
-            if len(row) < 2:
-                raise PFDSParseError(f"Malformed ARI header row: {line}")
-
-            current_return_periods = [_parse_numeric_label(cell) for cell in row[1:]]
-            result["tables"][current_section]["return_periods_years"] = current_return_periods
-            continue
-
-        # Data rows only valid after a header row
-        if current_return_periods is None:
-            continue
-
-        row = next(csv.reader([line]))
-        if len(row) < 2:
-            continue
-
-        duration = row[0].strip()
-        if not duration:
-            continue
-
-        # Clean duration labels like "5-min:" -> "5-min"
-        duration = duration.rstrip(":").strip()
-
-        # Ignore repeated narrative/header junk if it leaks through
-        if duration.lower().startswith("precipitation frequency estimates"):
-            continue
-        if duration.lower().startswith("by duration for ari"):
-            continue
-
-        values: dict[str, float | str | None] = {}
-        numeric_count = 0
-
-        for rp, cell in zip(current_return_periods, row[1:]):
-            key = str(rp)
-            cell = cell.strip()
-
-            if cell in {"", "-", "--", "---"}:
-                values[key] = None
-                continue
-
-            try:
-                values[key] = float(cell)
-                numeric_count += 1
-            except ValueError:
-                values[key] = cell
-
-        # Only keep actual duration rows
-        if numeric_count == 0:
-            continue
-
-        result["tables"][current_section]["rows"].append(
-            {
-                "duration": duration,
-                "values": values,
-            }
-        )
-
-    # Sanity check
-    if not result["tables"]["expected"]["rows"]:
-        raise PFDSParseError("No expected-value PFDS rows were parsed.")
-
-    return result
-
-
-def pfds_json_to_csv_text(
-    pfds_json: dict[str, Any],
-    bound: BoundType = "expected",
-    float_format: str = "g",
-) -> str:
-    """
-    Convert one PFDS bound section to compact CSV text.
-    """
-    if bound == "all":
-        parts = []
-        for name in ("expected", "upper", "lower"):
-            parts.append(f"# {name}")
-            parts.append(pfds_json_to_csv_text(pfds_json, bound=name, float_format=float_format).rstrip())
-            parts.append("")
-        return "\n".join(parts).rstrip() + "\n"
-
-    table = pfds_json.get("tables", {}).get(bound)
-    if not table:
-        raise ValueError(f"Bound '{bound}' not found in parsed PFDS JSON.")
-
-    return_periods = table.get("return_periods_years", [])
-    rows = table.get("rows", [])
-
-    if not return_periods or not rows:
-        raise ValueError(f"PFDS JSON for bound '{bound}' is missing table data.")
-
-    out = io.StringIO()
-    writer = csv.writer(out, lineterminator="\n")
-
-    header = ["duration"] + [_format_return_period_label(rp) for rp in return_periods]
-    writer.writerow(header)
-
-    for row in rows:
-        out_row = [row["duration"]]
-        for rp in return_periods:
-            val = row["values"].get(str(rp))
-            if val is None:
-                out_row.append("")
-            elif isinstance(val, float):
-                out_row.append(format(val, float_format))
-            else:
-                out_row.append(str(val))
-        writer.writerow(out_row)
-
-    return out.getvalue()
-
-
-def get_pfds_table(
-    lat: float,
-    lon: float,
-    data: Literal["depth", "intensity"] = "intensity",
-    units: Literal["metric", "english"] = "metric",
-    series: Literal["pds", "ams"] = "pds",
-    output: OutputType = "json",
-    bound: BoundType = "expected",
-    timeout: int = 30,
-    session: Any | None = None,
-    float_format: str = "g",
-) -> dict[str, Any] | str:
-    """
-    High-level wrapper.
-
-    bound:
-      - expected : central estimate only
-      - upper    : upper 90% bound only
-      - lower    : lower 90% bound only
-      - all      : all three
-    """
-    text, request = fetch_pfds_table(
-        lat=lat,
-        lon=lon,
-        data=data,
-        units=units,
-        series=series,
-        timeout=timeout,
-        session=session,
-    )
-
-    parsed = parse_pfds_table(text=text, request=request)
-
-    if output == "json":
-        if bound == "all":
-            return parsed
-        return {
-            "request": parsed["request"],
-            "metadata": parsed["metadata"],
-            "table": parsed["tables"][bound],
-            "bound": bound,
-        }
-
-    if output == "csv":
-        return pfds_json_to_csv_text(parsed, bound=bound, float_format=float_format)
-
-    raise ValueError("output must be 'json' or 'csv'")
-
-
-def _parse_numeric_label(value: str) -> int | float | str:
-    value = value.strip()
-    try:
-        n = float(value)
-        return int(n) if n.is_integer() else n
-    except ValueError:
-        return value
-
-
-def _format_return_period_label(value: int | float | str) -> str:
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        return str(int(value)) if value.is_integer() else format(value, "g")
-    return str(value)
-```
+We can use the GRASS addon [r.noaa_atlas14](https://grass.osgeo.org/grass-devel/manuals/addons/r.noaa_atlas14.html) to retrieve precipitation frequency data from the NOAA Atlas 14 dataset for the location of interest. This tool allows us to get rainfall intensity values for different storm durations and return periods, which can be used as input for runoff calculations.
 
 ```{python}
 # | label: noaa-percip-freq
 # | echo: false
 
-pfds_json = get_pfds_table(
-        lat=39.4003765,
-        lon=-97.0630433,
-        data="intensity",
-        units="english",
-        series="pds",
-        output="json",
-)
-print(pfds_json)
-
-# CSV-style output
-pfds_csv = get_pfds_table(
-    lat=39.4003765,
-    lon=-97.0630433,
-    data="intensity",
-    units="english",
+pfds_csv = tools.r_noaa_atlas14(
+    mode="point",
+    statistic="intensity",
+    vector_output="noaa_atlas14_station",
+    coordinates=[-97.0630433, 39.4003765],
+    unit="english",
     series="pds",
-    output="csv",
-    bound="expected",   # <- this is the key fix
-    float_format=".3g",
-)
-print(pfds_csv)
+    bound="expected",
+    format="csv",
+).text
 ```
 
 
@@ -762,7 +495,7 @@ print(max_tc)
 df_rf_intensity = pd.read_csv(io.StringIO(pfds_csv))
 display(
     df_rf_intensity.style.hide(axis="index")
-    .set_caption("Rainfall Intensity — NOAA Atlas 14, Coweeta, NC")
+    .set_caption("Rainfall Intensity — NOAA Atlas 14, Clay Center, NC")
     .format(
         {
             "Value": lambda v: f"{v:,.3f}"
@@ -771,7 +504,9 @@ display(
         }
     )
 )
+```
 
+```{python}
 # | label: rainfall_intensity_figure
 # | echo: false
 # | fig-cap: "NOAA Atlas 14 rainfall intensity by storm duration for Coweeta, NC, with the maximum time of concentration marked."
@@ -944,15 +679,23 @@ Let's visualize the runoff depth
 
 ```{python}
 # | label: runoff_map
-with gs.RegionManager(raster="runoff_depth", s="s-200", flags="a"):
-    tools.r_colors(map="runoff_depth", color="water")
+# | layout-ncol: 1
+# | echo: false
+# | fig-cap: "Runoff Depth Map."
+# | fig-subcap:
+# |     - Derived runoff depth (mm)
+with gs.RegionManager(raster="runoff_depth", s="s-275", flags="a"):
     m = gj.Map(use_region=True)
+    tools.r_colors(map="runoff_depth", color="water")
     m.d_shade(shade="relief", color="runoff_depth")
     m.d_legend(
-        raster="runoff_depth", at="5, 30, 2, 10", title="Runoff Depth (mm)", flags="b"
+        raster="runoff_depth",
+        title="Runoff Depth (mm)",
+        flags="",
+        at="8, 12, 20, 80",
+        fontsize=12,
     )
     m.show()
-
 ```
 
 Peak discharge and time to peak discharge maps

@@ -368,6 +368,9 @@ tmp_addon_test = [
     # "r.stream.stats",
     # "r.stream.variables",
     # "r.stream.watersheds"
+    "r.accumulate",
+    "r.runoff",
+    "r.curvenumber",
 ]
 for addon in tmp_addon_test:
     try:
@@ -472,17 +475,17 @@ tools.g_extension(
 ```{python}
 # | label: noaa_atlas14
 
-# tools.r_noaa_atlas14(
-#     mode="grid",
-#     statistic="intensity",
-#     unit="metric",
-#     series="pds",
-#     bound="expected",
-#     resample="bilinear",
-#     flags="i",
-#     # region="se",
-#     base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
-# )
+tools.r_noaa_atlas14(
+    mode="grid",
+    statistic="intensity",
+    unit="metric",
+    series="pds",
+    bound="expected",
+    resample="bilinear",
+    flags="i",
+    region="se",
+    # base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
+)
 # | Latitude | 35.0667° |
 # | Longitude | -83.4333° |
 outjson = tools.r_noaa_atlas14(
@@ -498,8 +501,6 @@ outjson = tools.r_noaa_atlas14(
     # region="se",
     # base_gis_url="https://hdsc.nws.noaa.gov/pub/hdsc/data",
 ).json
-
-pprint(outjson)
 ```
 
 We need the flow direction and stream maps to run `r.runoff` with time of concentration, which can be calculated using the `r.watershed` tool.
@@ -519,9 +520,10 @@ tools.r_watershed(
 ```{python}
 # | label: watershed_map
 
-with gs.RegionManager(raster="accumulation", w="w-1600", flags="a"):
+with gs.RegionManager(raster="accumulation", flags="a"):
     m = gj.Map(use_region=True)
     m.d_shade(shade="relief", color="accumulation")
+    m.d_vect(map="noaa_atlas14_station", color="blue", width=2)
     m.d_legend(
         raster="accumulation",
         title="Accumulation",
@@ -533,13 +535,6 @@ with gs.RegionManager(raster="accumulation", w="w-1600", flags="a"):
 
     m2 = gj.Map(use_region=True)
     m2.d_shade(shade="relief", color="basins")
-    m2.d_legend(
-        raster="basins",
-        title="Basins 50K threshold",
-        flags="s",
-        at="5, 30, 2, 10",
-        fontsize=12,
-    )
     m2.show()
 ```
 
@@ -636,7 +631,15 @@ df_tc_min = df_tc[["min", "mean", "max"]].apply(
 max_tc = df_tc_min["max"].max()
 print(max_tc)
 
-df_rf_intensity = pd.read_csv("data/r_intensity_pds.csv")
+_rf_table = outjson["table"]
+_rf_rps = [str(rp) for rp in _rf_table["return_periods_years"]]
+df_rf_intensity = pd.DataFrame(
+    [
+        {"duration": row["duration"], **{rp: row["values"].get(rp) for rp in _rf_rps}}
+        for row in _rf_table["rows"]
+    ],
+    columns=["duration"] + _rf_rps,
+)
 display(
     df_rf_intensity.style.hide(axis="index")
     .set_caption("Rainfall Intensity — NOAA Atlas 14, Coweeta, NC")
@@ -648,7 +651,9 @@ display(
         }
     )
 )
+```
 
+```{python}
 # | label: rainfall_intensity_figure
 # | echo: false
 # | fig-cap: "NOAA Atlas 14 rainfall intensity by storm duration for Coweeta, NC, with the maximum time of concentration marked."
