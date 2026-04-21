@@ -17,11 +17,11 @@ format:
     lightbox: true
 ---
 
-# [WIP] SSURGO Soil Data in GRASS
+# Coweeta, NC -- Soil-Informed Overland Flow Simulation
 
-This notebook demonstrates how to import SSURGO soil data into GRASS using the [r.in.ssurgo](https://grass.osgeo.org/grass-devel/manuals/addons/r.in.ssurgo.html) extension. The `r.in.ssurgo` tool can import both local SSURGO data and data from the Soil Data Access (SDA) web service. The imported data includes *soil areas*, *hydrologic groups*, *ksat maps*, and *mukey maps*, which can be used for hydrological modeling and analysis in GRASS.
+The Coweeta Hydrologic Laboratory sits in the southern Blue Ridge Mountains of western North Carolina, where steep slopes, dense mixed-hardwood canopy, and deep well-drained loams route most rainfall through subsurface pathways long before it reaches a channel. That makes Coweeta a demanding test for overland-flow models: soil and cover heterogeneity fundamentally reshape where runoff forms and how fast it travels. Typical shallow-water runs apply a single uniform rainfall rate to every cell, but real rainfall excess -- the fraction of precipitation that actually runs off -- varies pixel by pixel. This notebook imports USDA SSURGO soil data, derives a spatially varying rainfall-excess surface via SCS curve-number analysis, and feeds it into the SIMWE particle-based shallow-water model. We then compare the soil-informed simulation against a naive one that ignores soil variability, and animate the walker cloud colored by flow speed.
 
-The flowchart below (@fig_ssurgo_flowchart) illustrates the workflow for using SSURGO data in GRASS, including the tools and outputs that can be generated from the imported soil data. We will cover the following steps in this notebook:
+The workflow below (@fig_ssurgo_flowchart) traces data from SSURGO and NLCD inputs through curve number, time of concentration, and Manning's $n$ to SIMWE's depth, discharge, and walker outputs.
 
 ```{mermaid}
 %% label: fig_ssurgo_flowchart
@@ -72,11 +72,12 @@ flowchart TD
 
 ## Objectives
 
-1. **Import SSURGO soil data** into GRASS using `r.in.ssurgo`.
-2. **Visualize the imported soil maps**, including soil areas, hydrologic groups, ksat maps, and mukey maps.
-3. **Calculate curve number** using the imported hydrologic group map and a land cover map.
-4. **Calculate runoff depth and peak discharge** using the curve number map, flow direction, and time of concentration.
-5. **Run a basic SIMWE simulation** using the imported soil data and visualize the results.
+1. Import SSURGO soil properties (hydrologic groups, saturated hydraulic conductivity, MUKEYs) from either a local gSSURGO archive or the USDA Soil Data Access service.
+2. Derive a curve-number surface by combining hydrologic soil groups with NLCD 2024 land cover.
+3. Design a 100-year storm whose duration matches the watershed's time of concentration, ensuring peak-runoff conditions.
+4. Convert SCS curve-number runoff depths into a spatially varying rainfall-excess rate (mm/hr) suitable for SIMWE.
+5. Compute Manning's $n$ from NLCD to parameterize surface roughness for the shallow-water solver.
+6. Run SIMWE with and without soil-informed rainfall excess, then visualize the walker cloud colored by flow speed ($v = q/h$) from the model's own depth and discharge outputs.
 
 ```{python}
 # | label: imports
@@ -109,7 +110,9 @@ import grass.jupyter as gj
 from grass.tools import Tools
 ```
 
-We will examine the Coweeta site for this demonstration, which has a mapset called `ssurgo_demo` that we will use to import the SSURGO data and run the SIMWE model.
+## Study Area
+
+Coweeta Hydrologic Laboratory (35.0667 N, 83.4333 W) is a long-term USDA Forest Service research site near Otto, NC, with ~2700 ft (~820 m) of relief across forested headwater catchments. Hydrologic soil groups here are dominated by **B** (moderate infiltration) with pockets of **C** and **D** on thinner ridge soils, in contrast to the B/C/D cropland mosaic at the Clay Center site. Work happens inside a GRASS mapset called `ssurgo_demo` in a project aligned to the site's 3 m elevation raster.
 
 ```{python}
 # | label: init_session
@@ -124,13 +127,17 @@ try:
     tools.g_mapset(mapset=mapset, flags="c")
 except Exception as e:
     print(f"{e}")
+finally:
+    session.switch_mapset(mapset)
 ```
 
 ---
 
 ## Import SSURGO Data
 
-Install the `r.in.ssurgo` extension if it is not already installed. This extension is available in the GRASS Addons repository and can be installed using `g.extension`. The source code for this extension is also available in the `tools/r.soildb/r.in.ssurgo` directory of this repository.
+`r.in.ssurgo` can pull soil survey data in two modes: from a local **gSSURGO** state archive, or on-demand from the **Soil Data Access** (SDA) web service, which avoids the multi-GB download at the cost of network latency. Both modes produce the same outputs -- a soil-polygon vector plus categorical rasters for hydrologic group (HSG) and MUKEY, and low/representative/high saturated hydraulic conductivity ($K_{sat}$) rasters -- which downstream tools use as inputs to curve-number and infiltration models.
+
+Source for the `r.in.ssurgo` addon lives in `tools/r.soildb/r.in.ssurgo` in this repository; install it via `g.extension` pointing at that path (or from the GRASS Addons repository once it's merged).
 
 ```{python}
 # | label: install_extension
@@ -144,7 +151,9 @@ tools.g_extension(
 
 ```
 
-Set the computational region to the elevation raster and create a relief raster for hillshading.
+### Computational Region
+
+We align the computational region to the 3 m elevation raster so every derived layer -- soil rasters, curve number, Manning's $n$, SIMWE outputs -- shares the same grid. A companion shaded-relief raster provides the cartographic backdrop for every map that follows.
 
 ```{python}
 # | label: set_region
@@ -152,36 +161,14 @@ region_text = tools.g_region(raster="elevation", flags="p").text
 print(region_text)
 ```
 
-Let's also create a relief raster for hillshading or soil maps.
-
 ```{python}
+# | label: create_relief
 tools.r_relief(input="elevation", output="relief")
 ```
 
-Import SSURGO data using `r.in.ssurgo`. Note that this will import the soil areas map, hydrologic group map, and ksat maps for low, regular, and high values. The `mukey` column is also imported as a raster with a categorical color scheme applied. The hydrologic group map also has a categorical color scheme applied.
+### Loading the soil data
 
-:::{.panel-tabset}
-
-## Local Import
-
-```{python}
-# | label: import_ssurgo_local
-# | eval: false
-
-tools.r_in_ssurgo(
-    ssurgo_path="../data/gSSURGO_NC.zip",
-    soils="soil_areas",
-    hydgrp="hydgrp",
-    ksat_l="ksat_l",
-    ksat_r="ksat_r",
-    ksat_h="ksat_h",
-    mukey="mukey",
-    hzdept_r=0,
-    hzdepb_r=100,
-    desgnmaster="A",
-    nprocs=30
-)
-```
+The local tab below imports from a downloaded gSSURGO North Carolina archive; the SDA tab queries the web service directly (no prior download). The horizon window (`hzdept_r=0`, `hzdepb_r=100` cm) and master designation filter (`desgnmaster="A"`) select the top 100 cm of A-horizon material, since rainfall-excess generation on forested slopes is dominated by near-surface soil properties. Outputs are suffixed `_sda` when imported via SDA so both versions can coexist.
 
 
 ## SDA Import
@@ -203,130 +190,138 @@ tools.r_in_ssurgo(
 )
 ```
 
-:::
-
 ## Visualize Imported Data
 
-The tool imports the soil polygons as a vector map (`soil_areas_sda`), which contains the soil polygons with attributes from the SSURGO database.
-
-```{python}
-# | label: SDA soil attributes
-# | echo: false
-
-json_data = tools.v_db_select(map="soils_polygons", format="json").json
-df = pd.DataFrame(json_data["records"])
-display(df.head())
-```
-
+Before feeding the soil surfaces into hydrologic models, it's worth confirming the imports look right. The soil polygons (`soil_areas_sda`) carry the full SSURGO attribute table -- MUKEY, component percentages, hydrologic group, texture, and permeability by horizon -- while the companion rasters are pre-rendered MUKEY, HSG, and three $K_{sat}$ percentiles (low / representative / high) for fast map algebra.
 
 ### MUKEY Map
+
+MUKEY (map-unit key) is the atomic identifier that ties every raster cell back to a row in the SSURGO attribute database. Distinct MUKEY patches mark where component-level differences -- texture, depth, drainage class, percent rock -- vary even when the aggregated hydrologic group stays the same.
 
 ```{python}
 # | label: mukey
 # | echo: false
-
-# m = gj.Map(use_region=True)
-# m.d_shade(shade="relief", color="mukey")
-# m.d_vect(map="soil_areas", color="black", fillcolor="none", width=0.5)
-# # m.d_legend(raster="mukey", title="MUKEY", flags="b")
-# m.show()
-
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="mukey_sda")
-m.d_vect(map="soil_areas_sda", color="black", fillcolor="none", width=0.5)
-# m.d_legend(raster="mukey", title="MUKEY", flags="b")
-m.show()
-```
-
-
-```{python}
-# | echo: false
-# | eval: false
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="mukey")
-m.d_vect(map="soils_polygons", color="black", fillcolor="white", width=0.5)
-m.show()
+# | fig-cap: "MUKEY patches at Coweeta with soil polygon boundaries overlaid. The mosaic reflects distinct component assemblages even where the aggregated hydrologic group is the same."
+with gs.RegionManager(raster="mukey_sda", flags="a"):
+    m = gj.Map(use_region=True, width=700)
+    m.d_shade(shade="relief", color="mukey_sda")
+    m.d_vect(map="soil_areas_sda", color="black", fillcolor="none", width=0.5)
+    m.d_barscale(
+        at=(60, 5),
+        font="Fira Sans Condensed Light",
+        fontsize=14,
+        length=2,
+        units="kilometers",
+        width_scale=1,
+        bgcolor="none",
+        color="#f9f9f9",
+        flags="n",
+    )
+    m.show()
 ```
 
 ### Ksat Maps
+
+SSURGO reports saturated hydraulic conductivity as a low / representative / high percentile triplet that captures within-map-unit variability. Importing all three ($K_{sat,l}$, $K_{sat,r}$, $K_{sat,h}$) lets downstream infiltration models run at the representative value and be stress-tested against the bracketing bounds.
 
 ```{python}
 # | label: ksat
 # | layout-ncol: 3
 # | echo: false
-# | fig-cap: "Ksat maps for low, regular, and high values"
+# | fig-cap: "SSURGO saturated hydraulic conductivity at Coweeta, shown for the low, representative, and high estimates within each map unit. The same absolute color ramp (browns = low $K_{sat}$, blues = high) is applied to all three panels so they are directly comparable -- the high-estimate panel is visibly more permeable because it uses the upper-bound $K_{sat}$ within each component."
 # | fig-subcap:
 # |     - Low
-# |     - Regular
+# |     - Representative
 # |     - High
+from io import StringIO
 
 
-# m = gj.Map(use_region=True)
-# m.d_shade(shade="relief", color="ksat_l")
-# m.d_legend(raster="ksat_l", title="Ksat (mm/hr)", flags="db")
-# m.show()
+def ksat_color_scheme(vmin: float = 0.0, vmax: float = 150.0) -> str:
+    """Return an r.colors rules string mapping absolute Ksat values (mm/hr)
+    from browns (slow infiltration) to blues (fast) across [vmin, vmax]."""
+    stops = [
+        (0.00, "#3B1F0E"),  # very slow (clays, compacted)
+        (0.10, "#5A2D1A"),
+        (0.20, "#7A3F1D"),
+        (0.30, "#9C5A2A"),  # low-moderate
+        (0.40, "#B97C3F"),
+        (0.50, "#D6A95C"),  # loams
+        (0.60, "#BFD38A"),  # moderate-high
+        (0.70, "#8FCB9B"),
+        (0.80, "#5FB7B2"),  # high (sands)
+        (0.90, "#3A8FB7"),
+        (1.00, "#1E5E8C"),  # very high (gravel, macroporous)
+    ]
+    return "\n".join(
+        f"{vmin + frac * (vmax - vmin):.3f} {color}" for frac, color in stops
+    ) + "\n"
 
-# m = gj.Map(use_region=True)
-# m.d_shade(shade="relief", color="ksat_r")
-# m.d_legend(raster="ksat_r", title="Ksat (mm/hr)", flags="db")
-# m.show()
 
-# m = gj.Map(use_region=True)
-# m.d_shade(shade="relief", color="ksat_h")
-# m.d_legend(raster="ksat_h", title="Ksat (mm/hr)", flags="db")
-# m.show()
+ksat_maps = ["ksat_l_sda", "ksat_r_sda", "ksat_h_sda"]
+ksat_max = max(tools.r_info(map=m, format="json").json["max"] for m in ksat_maps)
+tools.r_colors(map=ksat_maps, rules=StringIO(ksat_color_scheme(0.0, ksat_max)))
 
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_l_sda", brighten=30)
-m.d_legend(raster="ksat_l_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
-
-m = gj.Map(use_region=True, filename="output/coweeta_ksat_r_sda.png")
-m.d_shade(shade="relief", color="ksat_r_sda", brighten=30)
-m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
-
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="ksat_h_sda", brighten=30)
-m.d_legend(raster="ksat_h_sda", title="Ksat (mm/hr)", flags="db")
-m.show()
+for ksat_map, out in zip(
+    ksat_maps,
+    [None, "output/coweeta_ksat_r_sda.png", None],
+):
+    kwargs = {"use_region": True, "width": 600}
+    if out:
+        kwargs["filename"] = out
+    with gs.RegionManager(raster=ksat_map, s="s-1500", flags="a"):
+        m = gj.Map(**kwargs)
+        m.d_shade(shade="relief", color=ksat_map, brighten=30)
+        m.d_legend(
+            raster=ksat_map,
+            title="Ksat (mm/hr)",
+            at="5, 10, 20, 80",
+            font="Fira Sans Condensed Light",
+            fontsize=16,
+            flags="n",
+            range=[0.0, ksat_max],
+        )
+        # m.d_barscale(
+        #     at=(67, 5),
+        #     font="Fira Sans Condensed Light",
+        #     fontsize=11,
+        #     length=2,
+        #     units="kilometers",
+        #     width_scale=1,
+        #     bgcolor="none",
+        #     color="#4f4e4e",
+        #     flags="n",
+        # )
+        m.show()
 ```
 
 ### Hydrologic Group
 
-We can visualize the hydrologic group maps to compare the local and SDA imports. The hydrologic group map is a categorical raster with values of A, B, C, D, and A/D. The color scheme is applied using `r.colors` with the `hydgrp` color table.
+Hydrologic soil groups (HSG) are a four-class condensation of SSURGO's detailed soil properties into categories **A** (high infiltration, sand/gravel) through **D** (low infiltration, clay/shallow bedrock), with **A/D** marking soils whose behavior depends on drainage. HSG is the direct input to the SCS curve-number lookup table, so any coarseness in this raster propagates into every subsequent runoff calculation.
 
 ```{python}
 # | label: hydrologic_group_map
 # | layout-ncol: 1
 # | echo: false
-# | fig-cap: "Hydrologic groups"
+# | fig-cap: "Hydrologic soil groups at Coweeta. Group B dominates the ridgeline forest with pockets of C on thinner soils; no group A (high infiltration) appears in this catchment."
 
-with gs.RegionManager(raster="hydgrp_sda", s="s-50000", flags="a"):
-    m = gj.Map(use_region=False)
+with gs.RegionManager(raster="hydgrp_sda", w="w-5000", flags="a"):
+    m = gj.Map(use_region=True, width=700)
     m.d_shade(shade="relief", color="hydgrp_sda")
-    m.d_legend(raster="hydgrp_sda", flags="bn", at="0, 30, 1, 30")
+    m.d_legend(
+        raster="hydgrp_sda",
+        flags="nc",
+        at="50, 95, 2, 5",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+    )
     m.show()
-```
-
-
-```{python}
-# | label: hydrologic_group_map_comparison
-# | echo: false
-# | eval: false
-tools.r_mapcalc(
-    expression="hydgrp_diff = hydgrp - hydgrp_sda",
-)
-
-m = gj.Map(use_region=True)
-m.d_shade(shade="relief", color="hydgrp_diff")
-m.d_legend(raster="hydgrp_diff", title="Difference", flags="b")
-m.show()
 ```
 
 ## Calculate Curve Number
 
-Install the `r.curvenumber` extension if it is not already installed. This extension is available in the GRASS Addons repository and can be installed using `g.extension`.
+The SCS curve number (CN) is an empirical index, from 0 to 100, that captures how much of a given rainfall depth becomes runoff. High CNs mean runoff-prone surfaces (impervious, bare, hydrologic group D); low CNs mean infiltration-dominant surfaces (forested, group A). CN is computed from an HSG × land cover lookup table, so it's the natural bridge between SSURGO's soil classes and NLCD's cover classes.
+
+Install `r.curvenumber` from the GRASS Addons repository:
 
 ```python
 # | label: install_curvenumber_text
@@ -366,7 +361,9 @@ for addon in tmp_addon_test:
 ```
 
 
-To calculate the curve number, we need both a land cover map and a hydrologic soil group map. The land cover map is from the National Land Cover Database (NLCD) 2024 dataset, which was imported as a COG raster. The `landcover_source` parameter specifies that the land cover map is from the NLCD dataset, which allows the tool to use the appropriate lookup table for curve number values.
+### Land Cover
+
+CN requires a land cover raster alongside the HSG raster. We use NLCD 2024, the most recent national land cover product, imported as a cloud-optimized GeoTIFF so the `r.import` call only reads the pixels that fall inside the current computational region.
 
 ```{python}
 #| label: import_landcover
@@ -380,24 +377,72 @@ tools.r_import(
 
 ```
 
-NLCD 2024 land cover map:
+The imported raster carries numeric class codes (21, 41, 42…) but no human-readable labels -- the legend would render as a column of bare numbers. Since `nlcd_2024` lives in PERMANENT and `r.category` only writes to the current mapset, we copy it into `ssurgo_demo` first, then attach the standard NLCD 2024 class names inline.
 
 ```{python}
 # | label: landcover_map
-with gs.RegionManager(raster="nlcd_2024", w="w-1600", flags="a"):
-    m = gj.Map(use_region=True)
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: "NLCD 2024 land cover at Coweeta. The canopy is dominated by deciduous and mixed forest with narrow ribbons of developed, open space along valley floors -- a land-cover distribution that pushes most cells toward low curve-number (infiltration-friendly) values in the next step."
+import io
+
+gs.run_command(
+    "g.copy",
+    raster=("nlcd_2024@PERMANENT", "nlcd_2024"),
+    overwrite=True,
+)
+
+with gs.RegionManager(raster="nlcd_2024", w="w-5100", flags="a"):
+    tools.r_category(
+        map="nlcd_2024",
+        separator="|",
+        rules=io.StringIO(
+            "11|Open Water\n"
+            "12|Perennial Ice/Snow\n"
+            "21|Developed, Open Space\n"
+            "22|Developed, Low Intensity\n"
+            "23|Developed, Medium Intensity\n"
+            "24|Developed, High Intensity\n"
+            "31|Barren Land\n"
+            "41|Deciduous Forest\n"
+            "42|Evergreen Forest\n"
+            "43|Mixed Forest\n"
+            "52|Shrub/Scrub\n"
+            "71|Grassland/Herbaceous\n"
+            "81|Pasture/Hay\n"
+            "82|Cultivated Crops\n"
+            "90|Woody Wetlands\n"
+            "95|Emergent Herbaceous Wetlands\n"
+        ),
+    )
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="nlcd_2024")
     m.d_legend(
         raster="nlcd_2024",
-        title="NLCD 2024",
-        flags="",
-        at="5,80,2,45",
-        fontsize=12,
+        title="Land Cover",
+        flags="cn",
+        at="15,85,2,35",
+        fontsize=14,
+        font="Fira Sans Condensed Light",
+    )
+    m.d_barscale(
+        at=(3, 10),
+        font="Fira Sans Condensed Light",
+        fontsize=10,
+        length=3,
+        width_scale=1,
+        units="kilometers",
+        bgcolor="none",
+        style="both_ticks",
+        color="#3e3e3e",
+        flags="n",
     )
     m.show()
 ```
 
-Calculate the hydrolic curve number using the [r.curvenumber](https://grass.osgeo.org/grass-devel/manuals/addons/r.curvenumber.html) extension, which requires both a land cover map and a hydrologic soil group map. The land cover map is from the National Land Cover Database (NLCD) 2024 dataset, which was imported as a COG raster. The `landcover_source` parameter specifies that the land cover map is from the NLCD dataset, which allows the tool to use the appropriate lookup table for curve number values.
+### Deriving the CN raster
+
+With HSG and NLCD in hand, [`r.curvenumber`](https://grass.osgeo.org/grass-devel/manuals/addons/r.curvenumber.html) applies the standard SCS lookup. `landcover_source="nlcd"` tells the tool to use the NLCD-specific class-to-CN table (rather than the default NCDS or custom tables), which matters because class codes differ across land-cover datasets.
 
 ```{python}
 # | label: curvenumber_calc
@@ -410,18 +455,43 @@ tools.r_curvenumber(
 ```
 
 ```{python}
-#| label: curvenumber_map
+# | label: curvenumber_map
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: "Curve number at Coweeta derived from NLCD 2024 and hydrologic soil group. Values span 32 (forested soils, heavy infiltration) to 89 (developed patches on group-C soils)."
 
-with gs.RegionManager(raster="curvenumber", w="w-1600", flags="a"):
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="curvenumber", s="s-1500", flags="a"):
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="curvenumber")
-    m.d_legend(raster="curvenumber", title="Curve Number", flags="s", at="5, 30, 2, 10", fontsize=12)
+    m.d_legend(
+        raster="curvenumber",
+        title="Curve Number",
+        at="5, 10, 20, 80",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        flags="",
+    )
+    m.d_barscale(
+        at=(60, 20),
+        font="Fira Sans Condensed Light",
+        fontsize=11,
+        length=2,
+        units="kilometers",
+        width_scale=1,
+        bgcolor="none",
+        color="#ffffff",
+        flags="n",
+    )
     m.show()
 ```
 
-## Calculate Runoff and time of concentration
+## Runoff and Time of Concentration
 
-Let's also run [r.runoff](https://grass.osgeo.org/grass-devel/manuals/addons/r.runoff.html) to calculate runoff depth using the curve number method. This tool requires a precipitation raster, which we can create using `r.mapcalc` with a constant value for precipitation.
+A CN raster alone doesn't yet tell us how much runoff a particular storm produces -- we also need a design storm depth (how much rain fell) and the watershed's time of concentration $T_c$ (how long the longest flow path takes to drain). Pairing $T_c$ with an IDF curve identifies the storm duration that generates the peak runoff response, which is the storm we want to simulate with SIMWE.
+
+### Extension installs
+
+`r.timeofconcentration`, `r.stream.distance`, and `r.noaa.atlas14` are needed for this section and are pulled from a local checkout of the grass-addons fork.
 
 ```{python}
 # | label: install_toc_extension
@@ -454,11 +524,13 @@ tools.g_extension(
 )
 ```
 
+### Design storm from NOAA Atlas 14
+
+NOAA Atlas 14 provides point-based precipitation frequency estimates indexed by return period (1, 2, 5, ... 1000 yr) and duration (5 min to 60 day). A `mode="point"` query at the Coweeta Experimental Station coordinates fetches the local IDF table without triggering the multi-GB regional grid download that `mode="grid"` would.
+
 ```{python}
 # | label: noaa_atlas14
 
-# Point query at the Coweeta study location (lon, lat) — avoids the multi-GB
-# regional grid download that mode="grid" triggers.
 outjson = tools.r_noaa_atlas14(
     mode="point",
     statistic="intensity",
@@ -471,7 +543,9 @@ outjson = tools.r_noaa_atlas14(
 ).json
 ```
 
-We need the flow direction and stream maps to run `r.runoff` with time of concentration, which can be calculated using the `r.watershed` tool.
+### Watershed analysis
+
+`r.runoff` and `r.timeofconcentration` both need a flow-direction raster, a stream network, and (optionally) basin boundaries. `r.watershed` derives all three from the DEM in a single call.
 
 ```{python}
 #| label: watershed
@@ -481,32 +555,52 @@ tools.r_watershed(
     accumulation="accumulation",
     stream="stream",
     basin="basins",
-    threshold=10,
+    threshold=1000,
 )
 ```
 
 ```{python}
 # | label: watershed_map
+# | echo: false
+# | layout-ncol: 2
+# | fig-cap: "Watershed products derived from the DEM by `r.watershed`. The NOAA Atlas 14 station coordinate is marked on the flow-accumulation panel."
+# | fig-subcap:
+# |     - Flow accumulation
+# |     - Sub-basins
 
-with gs.RegionManager(raster="accumulation", flags="a"):
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
+    # r.watershed flags cells with inflow from outside the region as negative
+    # accumulation values. Clip the legend (and the displayed stretch) to the
+    # positive-only side so the color ramp isn't dominated by that sentinel.
+    acc_max = tools.r_info(map="accumulation", format="json").json["max"]
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="accumulation")
-    m.d_vect(map="noaa_atlas14_station", color="blue", width=2)
+    m.d_vect(
+        map="noaa_atlas14_station",
+        color="black",
+        fill_color="orange",
+        icon="basic/circle",
+        size=10,
+    )
     m.d_legend(
         raster="accumulation",
-        title="Accumulation",
-        flags="s",
-        at="5, 30, 2, 10",
-        fontsize=12,
+        title="Accumulation (cells)",
+        flags="slt",
+        at="5, 10, 20, 80",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        range=[1, acc_max],
     )
     m.show()
 
-    m2 = gj.Map(use_region=True)
-    m2.d_shade(shade="relief", color="basins")
-    m2.show()
+m2 = gj.Map(use_region=True, width=600)
+m2.d_shade(shade="relief", color="basins")
+m2.show()
 ```
 
-Let calculate the time of concentration using the `r.timeofconcentration` tool, which requires an elevation raster, flow direction raster, and stream raster as inputs. The output is a raster of time of concentration values in hours.
+### Time of concentration
+
+`r.timeofconcentration` traces every cell's flow path downstream using the `flow_direction` and `stream` rasters, accumulating travel time to produce a per-cell $T_c$ estimate. `length_min=100` discards flow paths shorter than 100 m as numerical noise. The maximum of this raster is the watershed-scale $T_c$ that drives the design-storm duration below.
 
 ```{python}
 # | label: time_of_concentration
@@ -521,36 +615,37 @@ tools.r_timeofconcentration(
 
 ```{python}
 # | label: time_of_concentration_map
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: "Per-cell time of concentration at Coweeta. Values accumulate downstream along flow paths; the maximum sets the storm duration used to size rainfall intensity."
 
-with gs.RegionManager(raster="elevation", s="s-2100", flags="a"):
-    tools.r_colors(map="time_concentration", color="magma", flags="e")
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="elevation", s="s-1500", flags="a"):
+    tools.r_colors(map="time_concentration", color="byg", flags="e")
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="time_concentration")
-
     m.d_legend(
         raster="time_concentration",
-        at="8, 12, 20, 80",
         title="Time of Concentration (hours)",
+        at="5, 10, 20, 80",
         font="Fira Sans Condensed Light",
-        fontsize=14,
-        flags="s",
+        fontsize=16,
+        flags="sl",
     )
-    m.d_barscale(
-        at=(20, 28),
-        font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
-        width_scale=1,
-        units="kilometers",
-        bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
-        flags="n",
-    )
+    # m.d_barscale(
+    #     at=(67, 5),
+    #     font="Fira Sans Condensed Light",
+    #     fontsize=11,
+    #     length=2,
+    #     units="kilometers",
+    #     width_scale=1,
+    #     bgcolor="none",
+    #     color="#4f4e4e",
+    #     flags="n",
+    # )
     m.show()
 ```
 
-Let's check the univarite statistics for the time of concentration raster to see the range of values.
+A quick univariate summary confirms the range of $T_c$ values -- the maximum drives the storm duration used to size rainfall intensity in the next step.
 
 ```{python}
 # | label: time_of_concentration_stats
@@ -588,7 +683,9 @@ display(
 )
 ```
 
-We can use the the `time_concentration` raster as an input to the `r.runoff` tool, which calculates runoff depth and peak discharge using the curve number method. The `r.runoff` tool also requires a precipitation raster, which we can create using `r.mapcalc` with a constant value for precipitation ($50$ mm) over a 24 hour period.
+### Matching storm duration to Tc
+
+The storm that produces the peak runoff response at a given return period has a duration equal to $T_c$. We convert the watershed's $T_c$ from hours to minutes, look up the NOAA Atlas 14 intensity-duration-frequency (IDF) table, and interpolate the 100-year intensity at that duration.
 
 ```{python}
 # | label: tc_and_rfi
@@ -747,6 +844,10 @@ display(
 print(f"100-year storm intensity at max Tc ({max_tc:.2f} min): {storm_intensity_100yr:.2f} in/hr")
 ```
 
+### Rainfall depth for r.runoff
+
+`r.runoff` takes a total rainfall depth (mm) over the storm duration rather than an intensity rate, so we convert the interpolated intensity back to a depth using the $T_c$-matched storm duration.
+
 ```{python}
 # | label: precipitation_mm
 
@@ -798,57 +899,85 @@ tools.r_runoff(
 )
 ```
 
-Let's visualize the runoff depth
+### Runoff depth
+
+With the CN raster, rainfall depth, $T_c$, and flow-direction raster in hand, `r.runoff` produces the full suite of SCS-method outputs: per-cell runoff depth and volume, upstream-accumulated runoff, peak discharge, and time to peak. The `runoff_depth` raster is the critical input to the next step -- once normalized by duration, it becomes the rainfall-excess rate that SIMWE routes across the surface.
 
 ```{python}
 # | label: runoff_map
-with gs.RegionManager(raster="runoff_depth", w="w-1600", flags="a"):
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: "Runoff depth (mm) from the SCS method for the $T_c$-matched 100-year storm. Low-CN forest patches shed little runoff; higher-CN valley patches shed several centimeters."
+with gs.RegionManager(raster="runoff_depth", s="s-1500", flags="a"):
     tools.r_colors(map="runoff_depth", color="water")
-    m = gj.Map(use_region=True)
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="runoff_depth")
     m.d_legend(
-        raster="runoff_depth", at="5, 30, 2, 10", title="Runoff Depth (mm)", flags="b"
+        raster="runoff_depth",
+        title="Runoff Depth (mm)",
+        at="5, 10, 20, 80",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        flags="n",
     )
+    # m.d_barscale(
+    #     at=(67, 5),
+    #     font="Fira Sans Condensed Light",
+    #     fontsize=11,
+    #     length=2,
+    #     units="kilometers",
+    #     width_scale=1,
+    #     bgcolor="none",
+    #     color="#4f4e4e",
+    #     flags="n",
+    # )
     m.show()
-
 ```
 
-Peak discharge and time to peak discharge maps
+Peak discharge and time-to-peak maps give complementary information: discharge highlights where flow concentrates, while time-to-peak reveals the temporal response of different sub-basins.
 
 ```{python}
 # | label: peak_discharge_map
+# | echo: false
+# | layout-ncol: 2
+# | fig-cap: "SCS runoff response for the design storm."
+# | fig-subcap:
+# |     - Peak discharge (m³/s)
+# |     - Time to peak (hours)
 
-with gs.RegionManager(raster="peak_discharge", w="w-1600", flags="a"):
-    tools.r_colors(map="peak_discharge", color="magma", flags="")
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="peak_discharge", s="s-1500", flags="a"):
+    tools.r_colors(map="peak_discharge", color="magma",flags="n")
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="peak_discharge")
-
     m.d_legend(
         raster="peak_discharge",
-        at="5, 30, 2, 10",
         title="Peak Discharge (m³/s)",
-        flags="d",
+        at="5, 10, 20, 80",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        flags="n",
     )
     m.show()
 
-    tools.r_colors(map="time_to_peak", color="magma", flags="e")
-    m1 = gj.Map(use_region=True)
+    tools.r_colors(map="time_to_peak", color="magma", flags="ne")
+    m1 = gj.Map(use_region=True, width=600)
     m1.d_shade(shade="relief", color="time_to_peak")
-
     m1.d_legend(
         raster="time_to_peak",
-        at="5, 30, 2, 10",
         title="Time to Peak (hours)",
-        flags="d",
+        at="5, 10, 20, 80",
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        flags="ls",
     )
     m1.show()
 ```
 
 ## Manning's n Map
 
-We will calculate the Manning's n map using the `r.manning` extension, which uses the National Land Cover Dataset (2024) map to assign Manning's n values based on the lookup table from Kalyanapu et al. (2009). The output is a raster of Manning's n values that can be used as an input to the SIMWE model.
+SIMWE routes surface flow using the shallow-water momentum equation, with surface friction parameterized by Manning's $n$. Coefficient values depend strongly on land cover: open water has $n \approx 0.03$, dense forest $n \approx 0.4$ or higher. `r.manning` assigns $n$ per NLCD class using a lookup table; here we use the values from Kalyanapu et al. (2009), which are calibrated for overland flow rather than channel flow.
 
-We first must install the `r.manning` extension if it is not already installed. This extension is available in the GRASS Addons repository and can be installed using `g.extension`.
+Install `r.manning` if it isn't already available:
 
 ```{python}
 # | label: install_manning_extension
@@ -858,7 +987,7 @@ tools.g_extension(
 )
 ```
 
-Now we can calculate the roughness map using the `r.manning` tool.
+A fixed `seed=42` keeps the per-class stochastic jitter reproducible across runs.
 
 ```{python}
 # | label: r_manning_map
@@ -871,41 +1000,52 @@ tools.r_manning(
 )
 
 
-with gs.RegionManager(raster="mannings_n", s="s-2100", flags="a"):
-    tools.r_colors(map="mannings_n", color="plasma", flags="")
-    m = gj.Map(use_region=True)
-    m.d_shade(shade="relief", color="mannings_n")
+mannings_n_colors = io.StringIO(
+    "0.008 #F0E68C\n"   # Barren Land (low end)
+    "0.025 #6BAED6\n"   # Open Water
+    "0.040 #A1D99B\n"   # Developed, Open Space / Open Water (med)
+    "0.068 #BDBDBD\n"   # Developed, Low/Med Intensity
+    "0.160 #F4A460\n"   # Cultivated Crops
+    "0.183 #66C2A4\n"   # Emergent Herbaceous Wetlands
+    "0.325 #D4B86A\n"   # Pasture/Hay
+    "0.368 #A8C25C\n"   # Grassland/Herbaceous
+    "0.400 #2D8C2D\n"   # Mixed Forest / Shrub
+    "0.530 #1A5C1A\n"   # Dense Forest (high end)
+)
 
+with gs.RegionManager(raster="mannings_n", s="s-1500", flags="a"):
+    tools.r_colors(map="mannings_n", rules=mannings_n_colors)
+    m = gj.Map(use_region=True, width=600)
+    m.d_shade(shade="relief", color="mannings_n")
     m.d_legend(
         raster="mannings_n",
-        at="8, 12, 20, 80",
         title="Manning's n",
+        at="5, 10, 20, 80",
         font="Fira Sans Condensed Light",
-        fontsize=14,
-        flags="",
+        fontsize=16,
+        flags="sn",
     )
-    m.d_barscale(
-        at=(20, 28),
-        font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
-        width_scale=1,
-        units="kilometers",
-        bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
-        flags="n",
-    )
+    # m.d_barscale(
+    #     at=(67, 5),
+    #     font="Fira Sans Condensed Light",
+    #     fontsize=11,
+    #     length=2,
+    #     units="kilometers",
+    #     width_scale=1,
+    #     bgcolor="none",
+    #     color="#4f4e4e",
+    #     flags="n",
+    # )
     m.show()
 ```
 
-## Run SIMWE model
+## Run SIMWE
 
-Calcuate the slope and aspect from the elevation raster, which are required inputs for the `r.sim.water` tool.
+SIMWE (`r.sim.water`) solves the shallow-water momentum equation using a particle-based (walker) approach. Each walker carries a fraction of the total discharge along flow paths computed from the DEM gradient, depth, and Manning's $n$. The model needs four inputs: DEM, slope components ($dx$, $dy$), a rainfall-excess rate (mm/hr), and Manning's $n$. Outputs are per-timestep depth and unit-discharge rasters plus an optional walker vector cloud for visualization.
 
 ### Precipitation and Rainfall Excess
 
-We will use a constant rainfall value for the simulation, which is based on the 60 min 100 year storm from NOAA Atlas 14 for Coweeta, NC. The rainfall excess is calculated as the runoff depth divided by the duration of the storm (24 hours) to get a rainfall excess in mm/hr.
+The key difference between soil-aware and naive simulations is the rainfall-excess input. A naive run applies a uniform rate to every cell. The soil-informed version divides the per-cell runoff depth produced by the curve-number analysis by the storm duration, yielding a spatially varying mm/hr rate that implicitly encodes soil infiltration capacity and land-cover abstractions.
 
 | **Location Information** | **Value** |
 |---|---|
@@ -918,46 +1058,50 @@ We will use a constant rainfall value for the simulation, which is based on the 
 
 ![Coweeta Hydrologic Lab](data/coweeta_exp_stn.png)
 
-Rainfall excess map
+The resulting `rainfall_excess` map below is in mm/hr and drives SIMWE's interior source term.
+
+::: {.callout-note}
+The current divisor of 24 hr is a placeholder for the full daily storm bookkeeping -- the `TODO` in the cell flags that this should be $T_c$-normalized (≈ 0.78 hr) once the runoff model is reconciled with the $T_c$-matched storm duration.
+:::
 
 ```{python}
 # | label: rainfall_excess_map
 
 # Time of Concentration: 46.8 min
 tools.r_mapcalc(
-    expression=f"rainfall_excess = runoff_depth / 24.0", # TODO divide by correct time in hours based on time of concentration
+    expression=f"rainfall_excess = runoff_depth /  0.7828",  # 0.7828 hr = 46.8 min
 )
 
 
-with gs.RegionManager(raster="rainfall_excess", s="s-2100", flags="a"):
-    tools.r_colors(map="rainfall_excess", color="magma", flags="e")
-    m = gj.Map(use_region=True)
+with gs.RegionManager(raster="rainfall_excess", s="s-1500", flags="a"):
+    tools.r_colors(map="rainfall_excess", color="haxby", flags="en")
+    m = gj.Map(use_region=True, width=600)
     m.d_shade(shade="relief", color="rainfall_excess")
-
     m.d_legend(
         raster="rainfall_excess",
         title="Rainfall Excess (mm/hr)",
-        at="8, 12, 20, 80",
+        at="5, 10, 20, 80",
         font="Fira Sans Condensed Light",
-        fontsize=14,
-        flags="",
-    )
-    m.d_barscale(
-        at=(20, 28),
-        font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
-        width_scale=1,
-        units="kilometers",
-        bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        fontsize=16,
         flags="n",
     )
+    # m.d_barscale(
+    #     at=(67, 5),
+    #     font="Fira Sans Condensed Light",
+    #     fontsize=11,
+    #     length=2,
+    #     units="kilometers",
+    #     width_scale=1,
+    #     bgcolor="none",
+    #     color="#4f4e4e",
+    #     flags="n",
+    # )
     m.show()
 ```
 
-Calcuate the overland flow for a 47 min 100 year storm using the `r.sim.water` tool, which simulates overland flow using a particle-based approach. The tool requires the elevation raster, rainfall excess raster, and Manning's n raster as inputs, along with the number of walkers to simulate and the number of iterations to run. The output is a series of depth and discharge rasters that can be visualized as maps or animations.
+### Soil-informed simulation
+
+The first SIMWE run uses the soil-derived `rainfall_excess` map and simulates 48 min (covering the $T_c$-matched 100-year storm) with 100,000 walkers, writing depth, discharge, and walker snapshots every 2 min. The `flags="t"` option emits a time-indexed series rather than summary totals. Outputs are registered into a space-time raster dataset (STRDS) so downstream visualization tools can treat the run as a single animated object.
 
 ```{python}
 # | label: r_sim_water
@@ -977,10 +1121,9 @@ tools.r_sim_water(
     # niterations=1440 / 2,
     observation="sample_outlets",
     logfile="coweeta_100yr_simulation.log",
-    duration=48, # Minutes
-    # mintimestep=0,
+    duration=48, # Bump it to 48 min to cover the full storm duration (rounded up from 46.97 min)
     output_step=2,
-    nprocs=30,
+    nprocs=0,  # auto-detect
     flags="t",
 )
 
@@ -1016,18 +1159,20 @@ gs.run_command(
 
 ```{python}
 # | label: tc_100yr_depth_map
-# | eval: true
+# | echo: false
+# | layout-ncol: 1
+# | fig-cap: "Final-timestep overland flow depth draped over NAIP 2022 imagery. Sample outlet points are marked in orange."
 
-with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
     depth_list = gs.read_command(
         "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
     ).strip()
 
     max_depth = depth_list.split(",")[-1]
     stats = tools.r_info(map=max_depth, format="json").json
-    m = gj.Map(use_region=True, width=600)
+    m = gj.Map(use_region=True, width=700)
     m.d_shade(shade="relief", color="naip_2022_rgb@naip")
-    m.d_rast(map=max_depth, values=f"0.005-{stats['max']}")
+    m.d_rast(map=max_depth, values=f"0.0075-{stats['max']}")
     m.d_vect(
         map="sample_outlets",
         type="point",
@@ -1038,58 +1183,57 @@ with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
     )
     m.d_legend(
         raster=max_depth,
-        title="Deqpth [m]",
-        at="8, 12, 15, 85",
+        title="Depth (m)",
+        at="5, 10, 20, 80",
         font="Fira Sans Condensed Light",
-        range=[0.005, stats["max"]],
-        fontsize=14,
-        flags="",
+        fontsize=16,
+        range=[0.0075, stats["max"]],
+        flags="ls",
     )
     m.d_barscale(
-        at=(20, 28),
+        at=(62, 15),
         font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
-        width_scale=1,
+        fontsize=11,
+        length=2,
         units="kilometers",
+        width_scale=1,
         bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
+        color="#383838",
         flags="n",
     )
     m.show()
 ```
 
-Animation of depth maps
+The final-timestep depth map above captures the accumulated flood extent once rainfall has routed through the full watershed. To see the temporal evolution -- where water ponds first, which channels fill late, and how the drainage pattern develops -- we render the full STRDS as an animated GIF.
 
 ```{python}
 # | label: tc_100_depth_map
 # | eval: false
-depth_list = gs.read_command(
-    "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
-).strip()
 
-max_depth = depth_list.split(",")[-1]
-stats = tools.r_info(map=max_depth, format="json").json
-m = gj.TimeSeriesMap(use_region=True)
-m.d_rast(map="relief")
-m.add_raster_series("tc_100yr_depth_sum", values=f"0.025-{stats['max']}")
-m.d_legend(
-    raster=max_depth,
-    title="Depth [m]",
-    flags="bt",
-    border_color="none",
-    range=[0.005, stats["max"]],
-    at=(1, 50, 0, 5),
-)
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
+    depth_list = gs.read_command(
+        "g.list", type="raster", pattern="tc_100yr_depth.*", separator="comma"
+    ).strip()
 
-m.save("output/tc_100yr_simwe_depth_animation.gif")
-m.show()
+    max_depth = depth_list.split(",")[-1]
+    stats = tools.r_info(map=max_depth, format="json").json
+    m = gj.TimeSeriesMap(use_region=True, width=700)
+    m.d_rast(map="relief")
+    m.add_raster_series("tc_100yr_depth_sum", values=f"0.025-{stats['max']}")
+    m.d_legend(
+        raster=max_depth,
+        title="Depth [m]",
+        flags="ls",
+        border_color="none",
+        range=[0.025, stats["max"]],
+        at="5, 10, 20, 80",
+    )
+
+    m.save("output/tc_100yr_simwe_depth_animation.gif")
+    m.show()
 ```
 
-![Overland Flow Simulation with Soil Data](output/tc_100yr_simwe_depth_animation.gif)
-
-Overland Flow Simulation (100yr - 12hr storm) with Soil Data
+![Animated overland flow depth during the 100-year storm, soil-informed run.](output/tc_100yr_simwe_depth_animation.gif)
 
 ### Walker Velocity Animation
 
@@ -1106,6 +1250,9 @@ The `walkers_output` from `r.sim.water` stores walker positions but no velocity 
 depth_list = gs.read_command(
     "g.list", type="raster", pattern="tc_100yr_depth.*", separator=","
 ).strip().split(",")
+
+depth_list = [d.split("@", 1)[0] for d in depth_list]
+print(f"Found depth maps: {depth_list}")
 
 vel_list = []
 for depth in depth_list:
@@ -1150,6 +1297,9 @@ walker_maps = (
     .strip()
     .split(",")
 )
+# Strip any "@<mapset>" qualifier so suffix parsing and the derived output
+# names stay unqualified (same fix as compute_velocity_rasters).
+walker_maps = [w.split("@", 1)[0] for w in walker_maps]
 
 step = 50  # keep every Nth walker
 
@@ -1247,7 +1397,7 @@ print(gs.read_command("t.info", input="tc_100yr_walkers_stvds", type="stvds"))
 
 # Walkers are colored by their per-timestep velocity via the GRASSRGB column.
 # A final-timestep velocity raster is shown only to drive the legend's scale.
-with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
     vel_list = (
         gs.read_command(
             "g.list", type="raster", pattern="tc_100yr_velocity.*", separator=","
@@ -1257,7 +1407,7 @@ with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
     )
     vmax = tools.r_info(map=vel_list[-1], format="json").json["max"]
 
-    m = gj.TimeSeriesMap(use_region=True, width=600)
+    m = gj.TimeSeriesMap(use_region=True, width=700)
     m.d_shade(shade="relief", color="naip_2022_rgb@naip")
     m.add_vector_series(
         "tc_100yr_walkers_stvds",
@@ -1268,72 +1418,51 @@ with gs.RegionManager(raster="accumulation", s="s-2100", flags="a"):
     m.d_legend(
         raster=vel_list[-1],
         title="Velocity (m/s)",
-        flags="bt",
-        border_color="none",
-        fontsize=14,
-        range=[0.01, vmax],
-        at=(8, 12, 15, 85),
-    )
-
-    m.d_barscale(
-        at=(20, 28),
+        at="5, 10, 20, 80",
         font="Fira Sans Condensed Light",
-        fontsize=10,
-        length=3,
-        width_scale=1,
-        units="kilometers",
-        bgcolor="none",
-        style="both_ticks",
-        color="#f7f7f7",
-        flags="n",
+        fontsize=16,
+        range=[0.01, vmax],
+        flags="btn",
+        border_color="none",
     )
+    # m.d_barscale(
+    #     at=(67, 5),
+    #     font="Fira Sans Condensed Light",
+    #     fontsize=11,
+    #     length=2,
+    #     units="kilometers",
+    #     width_scale=1,
+    #     bgcolor="none",
+    #     color="#ffffff",
+    #     flags="n",
+    # )
     m.save("output/tc_100yr_walker_velocity_animation.gif")
     display(m.show())
 ```
 
 ![Walker positions colored by SIMWE flow speed ($v = q/h$)](output/tc_100yr_walker_velocity_animation.gif)
 
-```{python}
-# | label: depth_map
-# | eval: false
-m = gj.TimeSeriesMap(use_region=True)
-m.d_rast(map="relief")
-m.add_raster_series("depth_sum", values="0.025-1.25")
-m.d_legend(
-    raster="depth.720",
-    title="Depth [m]",
-    flags="bt",
-    border_color="none",
-    at=(1, 50, 0, 5),
-)
-# m.d_shade(shade="relief", color="depth")
-m.save("output/simwe_depth_animation.gif")
-m.show()
-```
+## Baseline: Uniform Rainfall (No Soil Data)
 
-![Overland Flow Simulation (100yr - 12hr storm) with Soil Data](output/simwe_depth_animation.gif)
-
-No soils
+To isolate the effect of soil heterogeneity, we run SIMWE a second time with the same DEM, Manning's $n$, and storm intensity, but replace the spatially varying `rainfall_excess` map with a single uniform rate (`rain_value=rain_mm_per_hour`). Any difference between the two runs is attributable solely to the soil-informed rainfall-excess surface rather than changes in terrain or roughness.
 
 ```{python}
 # | label: r_sim_water_no_soil
 # | eval: false
 
-# 12 hr 100 year storm is 16.2052 mm/hr
 tools.r_sim_water(
     elevation="elevation",
     depth="no_soil_depth",
     discharge="no_soil_discharge",
     walkers_output="no_soil_walkers",
     rain_value=rain_mm_per_hour,
-    # rain="rainfall_excess",  # Infiltration / Veg Intercept
     man="mannings_n",  # Mixed forest Kalyanapu et al. (2009)
     nwalkers=100000,
-    # infil="ksat_r_sda", # Infiltration of flowing water
-    niterations=1440 / 2,
-    # mintimestep=0,
+    duration=48, # Bump it to 48 min to cover the full storm duration (rounded up from 46.97 min)
+    observation="sample_outlets",
+    logfile="coweeta_100yr_no_soil_simulation.log",
     output_step=2,
-    nprocs=30,
+    nprocs=0,
     flags="t",
 )
 
@@ -1364,38 +1493,51 @@ gs.run_command(
     overwrite=True,
 )
 
-with gs.RegionManager(raster="accumulation", w="w-1600", flags="a"):
-    m = gj.Map(use_region=True)
+
+```
+
+```{python}
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
+    m = gj.Map(use_region=True, width=700)
+    stats = tools.r_info(map="no_soil_depth.47", format="json").json
+
     m.d_shade(shade="relief", color="naip_2022_rgb@naip")
-    m.d_rast(map="no_soil_depth.720", values="0.025-1.25")
+    m.d_rast(map="no_soil_depth.47", values=f"0.025-{stats['max']}")
     m.d_legend(
-        raster="no_soil_depth.720",
-        title="Depth [m]",
-        flags="btl",
+        raster="no_soil_depth.47",
+        title="Depth (m)",
+        at="5, 10, 20, 80",
+        range=[0.025, stats["max"]],
+        font="Fira Sans Condensed Light",
+        fontsize=16,
+        flags="ls",
         border_color="none",
-        at=(5, 50, 2, 5),
     )
     m.show()
 ```
 
-no soil animation
+### Temporal evolution without soils
+
+Animating the no-soil depth series over the same timeline makes the comparison direct -- watch where, and how quickly, ponded water appears in the uniform-rainfall case versus the soil-informed run above.
 
 ```{python}
 # | label: no_soil_depth_map_animation
 # | eval: false
-
-m = gj.TimeSeriesMap(use_region=True)
-m.d_rast(map="relief")
-m.add_raster_series("no_soil_depth_sum", values="0.025-1.25")
-m.d_legend(
-    raster="no_soil_depth.720",
-    title="Depth [m]",
-    flags="bt",
-    border_color="none",
-    at=(1, 50, 0, 5),
-)
-m.save("output/no_soil_simwe_depth_animation.gif")
-m.show()
+with gs.RegionManager(raster="accumulation", s="s-1500", flags="a"):
+    m = gj.TimeSeriesMap(use_region=True, width=700)
+    stats = tools.r_info(map="no_soil_depth.47", format="json").json
+    m.d_rast(map="relief")
+    m.add_raster_series("no_soil_depth_sum", values=f"0.025-{stats['max']}")
+    m.d_legend(
+        raster="no_soil_depth.47",
+        title="Depth [m]",
+        flags="ls",
+        range=[0.025, stats["max"]],
+        border_color="none",
+        at=(5, 10, 20, 80),
+    )
+    m.save("output/no_soil_simwe_depth_animation.gif")
+    m.show()
 ```
 
-![Overland Flow Simulation without Soil Data](output/no_soil_simwe_depth_animation.gif)
+![Animated overland flow depth during the 100-year storm, uniform-rainfall (no-soil) baseline.](output/no_soil_simwe_depth_animation.gif)
