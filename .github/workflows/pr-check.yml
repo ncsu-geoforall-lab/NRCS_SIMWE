@@ -48,8 +48,15 @@ jobs:
             exit 1
           fi
 
+      # Tar the rendered site so files whose names contain characters that
+      # actions/upload-artifact@v4 rejects (e.g. "*" used as a wildcard
+      # placeholder in simulation output filenames) are preserved inside the
+      # archive. See #4.
+      - name: Package rendered docs as tarball
+        run: tar -czf rendered-site.tar.gz -C docs .
+
       - name: Upload static files as artifact
         uses: actions/upload-artifact@v4
         with:
           name: rendered-site
-          path: docs/
+          path: rendered-site.tar.gz
