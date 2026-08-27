@@ -17,21 +17,21 @@ The purpose of this agreement, between the [U.S. Department of Agriculture, Natu
 
 ## Sites
 
-::: {.columns}
+::: {.grid}
 
-::: {.column width="32%"}
+::: {.g-col-12 .g-col-md-4}
 
-### Clay Center
+### Clay Center, KS
 
-![claycenter3d](output/clay-center/elevation_3dmap.png)
+![](output/clay-center/elevation_3dmap.png)
 
 [View Report](output/clay-center/report.qmd)
 
 :::
 
-::: {.column width="32%"}
+::: {.g-col-12 .g-col-md-4}
 
-### Coweeta
+### Coweeta, NC
 
 ![](output/coweeta/elevation_3dmap.png)
 
@@ -39,13 +39,9 @@ The purpose of this agreement, between the [U.S. Department of Agriculture, Natu
 
 :::
 
-:::
+::: {.g-col-12 .g-col-md-4}
 
-::: {.columns}
-
-::: {.column width="32%"}
-
-### SFREC
+### SFREC, CA
 
 ![](output/SFREC/elevation_3dmap.png)
 
@@ -53,9 +49,9 @@ The purpose of this agreement, between the [U.S. Department of Agriculture, Natu
 
 :::
 
-::: {.column width="32%"}
+::: {.g-col-12 .g-col-md-4}
 
-### SJER
+### SJER, CA
 
 ![](output/SJER/elevation_3dmap.png)
 
@@ -63,13 +59,9 @@ The purpose of this agreement, between the [U.S. Department of Agriculture, Natu
 
 :::
 
-:::
+::: {.g-col-12 .g-col-md-4}
 
-::: {.columns}
-
-::: {.column width="32%"}
-
-### tx069-playas
+### TX069 Playas, TX
 
 ![](output/tx069-playas/elevation_3dmap.png)
 
@@ -87,4 +79,3 @@ This project is supported by the U.S. Department of Agriculture, Natural Resourc
 
 - Helena Mitasova (North Carolina State University)
 - Corey T. White (North Carolina State University)
-- Add your name here

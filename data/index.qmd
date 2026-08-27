@@ -10,6 +10,11 @@ format: html
 
 ### Download and install GRASS
 
+Install GRASS 8.4 or newer for your platform from the
+[GRASS download page](https://grass.osgeo.org/download/). The workflows on this
+site also use GRASS addons, which are installed with `g.extension` as
+needed by the scripts and notebooks.
+
 ### Create Python Virtual Environment
 
 ```bash
@@ -31,19 +36,19 @@ pip install -r requirements.txt
 
 ### Setup GRASS Projects
 
-Now create a new GRASS project for each of the study areas. The meta data for each site is located at
-[site-CRS-info.txt](../site-CRS-info.txt).
+Now create a new GRASS project for each of the study areas. The metadata for
+each site is stored in `site-CRS-info.txt` at the repository root:
 
-```plain
-# file: site-CRS-info.txt
-clay-center:32614:3:2021:39.4003765:-97.0630433:Kansas
-coweeta:26917:10:2022:35.0467816:-83.4497516:North Carolina
-SFREC:26910:1:2022:39.2731237:-121.3103158:California
-SJER:26911:1:2022:37.0949164:-119.7447120:California
-tx069-playas:32613:8:2022:34.4884740:-102.1068130:Texas
-```
+| Site | State | EPSG | Resolution (m) | NAIP Year | Latitude | Longitude |
+|------|-------|------|---------------:|-----------|---------:|----------:|
+| clay-center | Kansas | 32614 | 3 | 2021 | 39.4003765 | -97.0630433 |
+| coweeta | North Carolina | 26917 | 10 | 2022 | 35.0467816 | -83.4497516 |
+| SFREC | California | 26910 | 1 | 2022 | 39.2731237 | -121.3103158 |
+| SJER | California | 26911 | 1 | 2022 | 37.0949164 | -119.7447120 |
+| tx069-playas | Texas | 32613 | 8 | 2022 | 34.4884740 | -102.1068130 |
 
+Download and import the site data:
 
 ```bash
-$ python python3 scripts/download_data.py
+python3 scripts/download_data.py
 ```

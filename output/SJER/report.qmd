@@ -83,4 +83,4 @@ crs = "NAD83 / UTM zone 11N"
 
 | 1 m | 3 m | 10 m | 30 m
 | --- | --- | ---  | ---
-|![sensitivity_7/SJER_depth_1_2_s_030_average.png](sensitivity_7/SJER_depth_1_2_s_030_average.png)|![sensitivity_7/SJER_depth_3_2_s_120_average.png](sensitivity_7/SJER_depth_3_2_s_120_average.png)|![sensitivity_7/SJER_depth_10_2_s_070_average.png](sensitivity_7/SJER_depth_10_2_s_070_average.png)|![sensitivity_7/SJER_discharge_1_2_s_020_average.png](sensitivity_7/SJER_depth_30_2_s_020_average.png)
+|![sensitivity_7/SJER_depth_1_2_s_030_average.png](sensitivity_7/SJER_depth_1_2_s_030_average.png)|![sensitivity_7/SJER_depth_3_2_s_120_average.png](sensitivity_7/SJER_depth_3_2_s_120_average.png)|![sensitivity_7/SJER_depth_10_2_s_070_average.png](sensitivity_7/SJER_depth_10_2_s_070_average.png)|![sensitivity_7/SJER_depth_30_2_s_020_average.png](sensitivity_7/SJER_depth_30_2_s_020_average.png)

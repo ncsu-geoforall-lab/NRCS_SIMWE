@@ -27,7 +27,7 @@ The workflow below (@fig_ssurgo_flowchart) traces data from SSURGO and NLCD inpu
 %% label: fig_ssurgo_flowchart
 %% echo: false
 %% eval: true
-%% fig-cap: "(Draft) Flowchart of SSURGO SIMWE workflows"
+%% fig-cap: "Flowchart of SSURGO SIMWE workflows"
 flowchart TD
     A[r.in.ssurgo] --> B("Soils map vector")
     A[r.in.ssurgo] --> HG("Hydrologic group map")
@@ -191,7 +191,7 @@ tools.r_in_ssurgo(
 ```
 
 ```{python}
-# | label: import_ssurgo_sda
+# | label: import_ssurgo_local
 # | eval: false
 tools.r_in_ssurgo(
     ssurgo_path="data/gSSURGO_NC.zip",
@@ -225,9 +225,10 @@ import grass.script.array as garray
 import matplotlib.pyplot as plt
 
 a = garray.array3d(mapname="ksat_r")  # shape (z, y, x)
-fig, axes = plt.subplots(1, a.shape[0],
-figsize=(4*a.shape[0], 4))
-for i, ax in enumerate(axes):
+fig, axes = plt.subplots(
+    1, a.shape[0], figsize=(4 * a.shape[0], 4), squeeze=False
+)
+for i, ax in enumerate(axes[0]):
     ax.imshow(a[i], cmap="viridis")
     ax.set_title(f"ksat_r slice {i}")
 plt.show()
@@ -1104,7 +1105,7 @@ The key difference between soil-aware and naive simulations is the rainfall-exce
 The resulting `rainfall_excess` map below is in mm/hr and drives SIMWE's interior source term.
 
 ::: {.callout-note}
-The current divisor of 24 hr is a placeholder for the full daily storm bookkeeping -- the `TODO` in the cell flags that this should be $T_c$-normalized (≈ 0.78 hr) once the runoff model is reconciled with the $T_c$-matched storm duration.
+The runoff depth is divided by the $T_c$-matched storm duration (0.7828 hr = 46.8 min), so the resulting rate corresponds to the 100-year design storm delivered over the watershed's time of concentration.
 :::
 
 ```{python}

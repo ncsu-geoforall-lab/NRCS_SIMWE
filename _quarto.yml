@@ -2,6 +2,20 @@
 project:
   type: website
   output-dir: docs
+  render:
+    - "**/*.qmd"
+    - "*.qmd"
+    - "**/*.ipynb"
+    - "**/*.md"
+    - "!publications/**"
+    - "!notebooks/workshop.ipynb"
+    - "!notebooks/agu2024.qmd"
+    - "!notebooks/agu2024.ipynb"
+    - "!notebooks/agu2024_combined.ipynb"
+    - "!notebooks/interactive.ipynb"
+    - "!tools/g.ssurgo.query/**"
+    - "!tools/v.in.usgs.waterservices/**"
+    - "!tools/r.soildb/**"
 website:
   navbar:
     title: "SIMWE Soils Project"
@@ -16,8 +30,6 @@ website:
         href: notebooks/index.qmd
       - text: "Presentations"
         href: presentations/index.qmd
-      - text: "Publications"
-        href: publications/index.qmd
       - text: "Data"
         href: data/index.qmd
       - text: "Scripts"

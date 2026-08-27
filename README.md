@@ -58,18 +58,18 @@ pip install -r requirements.txt
     python scripts/download_data.py
     ```
 
-3. Calcuate 1st and 2nd order derivatives
+3. Calculate 1st and 2nd order derivatives
 
     Run the python script `scripts/geomorphology.py` to calculate
     1st and 2nd order derivatives.
 
     ```bash
-    python scripts/calculate_derivatives.py
+    python scripts/geomorphology.py
     ```
 
 ## Simulations
 
-Run the python script `scripts/simulation.py` to downlaod data and run
+Run the python script `scripts/simulation.py` to download data and run
 the SIMWE model.
 
 ```bash
@@ -94,4 +94,3 @@ Carolina State University.
 
 - Helena Mitasova (North Carolina State University)
 - Corey T. White (North Carolina State University)
-- Add your name here

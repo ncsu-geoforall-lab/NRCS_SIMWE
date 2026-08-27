@@ -7,5 +7,20 @@ date-modified: 05/05/2025
 listing:
     type: grid
     contents:
-     - "r.soildb/**/*.md"
+     - path: "https://grass.osgeo.org/grass-stable/manuals/r.sim.water.html"
+       title: "r.sim.water"
+       description: "SIMWE overland flow simulation. Solves the shallow-water flow equations with a particle-based (walker) method to produce water depth and discharge."
+       image: "images/r.sim.water.gif"
+     - path: "https://grass.osgeo.org/grass-stable/manuals/addons/r.in.ssurgo.html"
+       title: "r.in.ssurgo"
+       description: "Imports SSURGO soil data as rasters of hydrologic soil group, MUKEY, and saturated hydraulic conductivity."
+       image: "images/r.in.ssurgo.png"
+     - path: "https://grass.osgeo.org/grass-stable/manuals/addons/r.noaa.atlas14.html"
+       title: "r.noaa.atlas14"
+       description: "Retrieves NOAA Atlas 14 precipitation frequency estimates for design storm depth and intensity."
+       image: "images/r.noaa.atlas14.png"
+     - path: "https://grass.osgeo.org/grass-stable/manuals/addons/r.soils.rosetta.html"
+       title: "r.soils.rosetta"
+       description: "Estimates van Genuchten soil hydraulic parameters and saturated hydraulic conductivity from soil texture using the USDA Rosetta pedotransfer model."
+       image: "images/r.soils.rosetta.png"
 ---

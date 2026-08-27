@@ -62,5 +62,5 @@ funding:
   - id: usda-nrcs
     name: USDA Natural Resources Conservation Service
     url: "https://www.nrcs.usda.gov/"
-    logo: "assets/logos/usda-nrcs_horizontal_white.png"
+    logo: "assets/logos/usda_nrcs_horizontal_white.png"
     grant: ""

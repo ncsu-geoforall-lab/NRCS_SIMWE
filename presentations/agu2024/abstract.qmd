@@ -1,9 +1,8 @@
 ---
-title: Abstract
+title: AGU 2024 Abstract
 subtitle: Sensitivity Analysis of Spatial Scale and Particle Density on Overland Flow Pattern Accuracy and Computational Demand
 date: April 16, 2025
 date-modified: 05/05/2025
-# doi: 10.5281/ZENODO.15237651 # Create DOI
 author:
   - name: "Corey T. White"
     degrees: PhD
