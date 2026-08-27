@@ -1,125 +1,108 @@
 ---
 title: Clay Center
-jupyter: python3
-format: html
+subtitle: Site Report
+description: Cultivated cropland on gentle loess terrain in the Republican River basin, Kansas.
+image: elevation_3dmap.png
+
 author: Corey T. White
 date: May 8, 2025
-execute:
-    freeze: auto
+date-modified: August 27, 2026
 
 page-layout: full
 title-block-banner: true
-image: elev.png
-subtitle: "Site Report"
-acknowledgements: |
-    This talk was funded by the [USDA Natural Resources Conservation Service (NRCS)](https://www.nrcs.usda.gov/).
+format: html
 
+execute:
+  freeze: auto
+jupyter: python3
 ---
 
-## Maps
+```{python}
+# | echo: false
+# | tags: [parameters]
 
-### NAIP Imagery and Derived Products
+project_name = "Clay Center"
+project_description = "Clay Center"
+project_location = "Kansas"
+project_url = (
+    "https://github.com/ncss-tech/SIMWE-coordination/tree/main/sites/clay-center"
+)
+naip_year = 2021
+dem_resolution = "3 m"
+unit_of_measure = "meters"
+epsg = "32614"
+crs = "WGS 84 / UTM zone 14N"
+area_km2 = "1.53"
+cell_count = "170,244"
+elev_range = "376.69 - 396.57"
+elev_mean = "386.71"
+ars = "0.13"
+```
 
-* NAIP: 2021
+## Overview
 
-| NAIP | NDVI |
-| --- | --- |
-| [![naip.png](naip.png)](naip.png) | [![ndvi.png](ndvi.png)](ndvi.png) |
+The Clay Center site covers 1.53 km^2^ of cultivated cropland in the Republican River basin of north-central Kansas. Relief is gentle (a 19.9 m elevation range at 3 m resolution), so runoff patterns here are controlled less by terrain and more by soil properties: the deep loess soils span hydrologic soil groups B through D, producing a patchwork of infiltration capacities across otherwise uniform fields. That makes Clay Center the benchmark site for the soil-informed workflow (i.e., SSURGO hydrologic groups to curve number to rainfall excess) developed in the [Clay Center notebook](../../notebooks/ssurgo_clay_center.qmd).
 
-### 1st topographic derivatives
+What this site demonstrates:
 
-* 3m DEM
-* Unit of measure: meters
-* EPSG: 32614
-* CRS: WGS 84 / UTM zone 14N
+- Soil variability, not topography, drives where runoff concentrates on low-relief agricultural land.
+- The SSURGO-to-curve-number workflow produces spatially varying rainfall excess that a uniform-rainfall simulation misses.
+- A ground water scenario suite (seepage during rainfall, seepage only, and springs) on pre-saturated terrain.
 
-| Elevation | Elevation Histogram
-| --- | --- |
-| [![elev.png](elev.png)](elev.png) | [![elev_hist.png](elev_hist.png)](elev_hist.png) |
+{{< include /templates/_report-template.qmd >}}
 
-### 2nd order topographic derivatives
+## Ground Water
 
-| Slope | Aspect | Geomorphon |
-| --- | --- | --- |
-| [![slope.png](slope.png)](slope.png) | [![aspect.png](aspect.png)](aspect.png) | [![geomorphon.png](geomorphon.png)](geomorphon.png) |
+These runs replace the uniform rainfall input with stream-fed sources derived from flow accumulation, using 500,000 walkers and a 4-minute output step (`scripts/groundwater.py`). Three scenarios are simulated: groundwater seepage in streams during a 10 mm/hr rainfall, seepage with no rainfall, and springs at first-order streams only. Depth is in meters, discharge in m^3^/s.
 
-| Profile Curvature | Planform Curvature |
-| --- | --- |
-| [![tcurv.png](tcurv.png)](tcurv.png) | [![pcurv.png](pcurv.png)](pcurv.png) |
-
-
-### Soils
-
-| SSURGO MUKEY |
-| --- |
-| [![mukey.png](mukey.png)](mukey.png) |
-
-
-## Simulations
-
-### Default Parameters
-
-#### Depth
-
-| 2 Min | 4 Min | 6 Min | 8 Min | 10 min |
-| --- | --- | --- | --- | --- |
-| [![depth_02.png](basic/depth_02.png)](basic/depth_02.png) | [![depth_04.png](basic/depth_04.png)](basic/depth_04.png) | [![depth_06.png](basic/depth_06.png)](basic/depth_06.png) | [![depth_08.png](basic/depth_08.png)](basic/depth_08.png) | [![depth_10.png](basic/depth_10.png)](basic/depth_10.png) |
-
-Simulation GIF: [![depth_simulation.gif](basic/depth_simulation.gif)](basic/depth_simulation.gif)
-
-#### Discharge
-
-| 2 Min | 4 Min | 6 Min | 8 Min | 10 Min
-| --- | --- | --- | --- | ---
-| [![disch_02.png](basic/disch_02.png)](basic/disch_02.png) | [![disch_04.png](basic/disch_04.png)](basic/disch_04.png) | [![disch_06.png](basic/disch_06.png)](basic/disch_06.png) | [![disch_08.png](basic/disch_08.png)](basic/disch_08.png) | [![disch_10.png](basic/disch_10.png)](basic/disch_10.png) |
-
-### Pre-saturated terrain
-
-#### Depth - Simulated with groundwater seepage in streams during rainfall
+### Depth - Groundwater seepage in streams during rainfall
 
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
-| [![depth_rain_gw_04](ground_water2/depth_rain_gw_04.png)](ground_water2/depth_rain_gw_04.png) | [![depth_rain_gw_08](ground_water2/depth_rain_gw_08.png)](ground_water2/depth_rain_gw_08.png) | [![depth_rain_gw_12](ground_water2/depth_rain_gw_12.png)](ground_water2/depth_rain_gw_12.png) | [![depth_rain_gw_16](ground_water2/depth_rain_gw_16.png)](ground_water2/depth_rain_gw_16.png) | [![depth_rain_gw_20](ground_water2/depth_rain_gw_20.png)](ground_water2/depth_rain_gw_20.png) |
+| ![Depth, seepage with rainfall, 4 min](ground_water2/depth_rain_gw_04.png) | ![Depth, seepage with rainfall, 8 min](ground_water2/depth_rain_gw_08.png) | ![Depth, seepage with rainfall, 12 min](ground_water2/depth_rain_gw_12.png) | ![Depth, seepage with rainfall, 16 min](ground_water2/depth_rain_gw_16.png) | ![Depth, seepage with rainfall, 20 min](ground_water2/depth_rain_gw_20.png)
 
-#### Discharge - Simulated with groundwater seepage in streams during rainfall
-
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| [![disch_rain_gw_04](ground_water2/disch_rain_gw_04.png)](ground_water2/disch_rain_gw_04.png) | [![disch_rain_gw_08](ground_water2/disch_rain_gw_08.png)](ground_water2/disch_rain_gw_08.png) | [![disch_rain_gw_12](ground_water2/disch_rain_gw_12.png)](ground_water2/disch_rain_gw_12.png) | [![disch_rain_gw_16](ground_water2/disch_rain_gw_16.png)](ground_water2/disch_rain_gw_16.png) | [![disch_rain_gw_20](ground_water2/disch_rain_gw_20.png)](ground_water2/disch_rain_gw_20.png) |
-
-#### Depth - Simulated with groundwater seepage in streams no rainfall
+### Discharge - Groundwater seepage in streams during rainfall
 
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
-| [![depth_gw_04](ground_water2/depth_gw_04.png)](ground_water2/depth_gw_04.png) | [![depth_gw_08](ground_water2/depth_gw_08.png)](ground_water2/depth_gw_08.png) | [![depth_gw_12](ground_water2/depth_gw_12.png)](ground_water2/depth_gw_12.png) | [![depth_gw_16](ground_water2/depth_gw_16.png)](ground_water2/depth_gw_16.png) | [![depth_gw_20](ground_water2/depth_gw_20.png)](ground_water2/depth_gw_20.png) |
+| ![Discharge, seepage with rainfall, 4 min](ground_water2/disch_rain_gw_04.png) | ![Discharge, seepage with rainfall, 8 min](ground_water2/disch_rain_gw_08.png) | ![Discharge, seepage with rainfall, 12 min](ground_water2/disch_rain_gw_12.png) | ![Discharge, seepage with rainfall, 16 min](ground_water2/disch_rain_gw_16.png) | ![Discharge, seepage with rainfall, 20 min](ground_water2/disch_rain_gw_20.png)
 
-#### Discharge - Simulated with groundwater seepage in streams no rainfall
-
-| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
-| --- | --- | --- | --- | ---
-| [![disch_gw_04](ground_water2/disch_gw_04.png)](ground_water2/disch_gw_04.png) | [![disch_gw_08](ground_water2/disch_gw_08.png)](ground_water2/disch_gw_08.png) | [![disch_gw_12](ground_water2/disch_gw_12.png)](ground_water2/disch_gw_12.png) | [![disch_gw_16](ground_water2/disch_gw_16.png)](ground_water2/disch_gw_16.png) | [![disch_gw_20](ground_water2/disch_gw_20.png)](ground_water2/disch_gw_20.png) |
-
-#### Depth - Simulated with springs
+### Depth - Groundwater seepage in streams, no rainfall
 
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
-| [![depth_spring_04](ground_water2/depth_springs_04.png)](ground_water2/depth_springs_04.png) | [![depth_spring_08](ground_water2/depth_springs_08.png)](ground_water2/depth_springs_08.png) | [![depth_spring_12](ground_water2/depth_springs_12.png)](ground_water2/depth_springs_12.png) | [![depth_spring_16](ground_water2/depth_springs_16.png)](ground_water2/depth_springs_16.png) | [![depth_spring_20](ground_water2/depth_springs_20.png)](ground_water2/depth_springs_20.png) |
+| ![Depth, seepage only, 4 min](ground_water2/depth_gw_04.png) | ![Depth, seepage only, 8 min](ground_water2/depth_gw_08.png) | ![Depth, seepage only, 12 min](ground_water2/depth_gw_12.png) | ![Depth, seepage only, 16 min](ground_water2/depth_gw_16.png) | ![Depth, seepage only, 20 min](ground_water2/depth_gw_20.png)
 
-#### Discharge - Simulated with springs
+### Discharge - Groundwater seepage in streams, no rainfall
 
 | 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
 | --- | --- | --- | --- | ---
-| [![disch_spring_04](ground_water2/disch_springs_04.png)](ground_water2/disch_springs_04.png) | [![disch_spring_08](ground_water2/disch_springs_08.png)](ground_water2/disch_springs_08.png) | [![disch_spring_12](ground_water2/disch_springs_12.png)](ground_water2/disch_springs_12.png) | [![disch_spring_16](ground_water2/disch_springs_16.png)](ground_water2/disch_springs_16.png) | [![disch_spring_20](ground_water2/disch_springs_20.png)](ground_water2/disch_springs_20.png) |
+| ![Discharge, seepage only, 4 min](ground_water2/disch_gw_04.png) | ![Discharge, seepage only, 8 min](ground_water2/disch_gw_08.png) | ![Discharge, seepage only, 12 min](ground_water2/disch_gw_12.png) | ![Discharge, seepage only, 16 min](ground_water2/disch_gw_16.png) | ![Discharge, seepage only, 20 min](ground_water2/disch_gw_20.png)
 
+### Depth - Springs
 
-### Sensitivity Analysis
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![Depth, springs, 4 min](ground_water2/depth_springs_04.png) | ![Depth, springs, 8 min](ground_water2/depth_springs_08.png) | ![Depth, springs, 12 min](ground_water2/depth_springs_12.png) | ![Depth, springs, 16 min](ground_water2/depth_springs_16.png) | ![Depth, springs, 20 min](ground_water2/depth_springs_20.png)
 
-#### Variable Basin Extents based on resolution
+### Discharge - Springs
 
-[![sensitivity_7/clay-center_basin_overlap.png](sensitivity_7/clay-center_basin_overlap.png)](sensitivity_7/clay-center_basin_overlap.png)
+| 4 Min | 8 Min | 12 Min | 16 Min | 20 Min
+| --- | --- | --- | --- | ---
+| ![Discharge, springs, 4 min](ground_water2/disch_springs_04.png) | ![Discharge, springs, 8 min](ground_water2/disch_springs_08.png) | ![Discharge, springs, 12 min](ground_water2/disch_springs_12.png) | ![Discharge, springs, 16 min](ground_water2/disch_springs_16.png) | ![Discharge, springs, 20 min](ground_water2/disch_springs_20.png)
 
-#### Variable Spatial Resolution based on watershed extent at resolution at output step 120
+## Sensitivity Analysis
+
+The sensitivity analysis re-runs the simulation across DEM resolutions of 1, 3, 10, and 30 m and walker densities of 0.25 to 2 walkers per cell, with 10 random seeds per combination and 120 one-minute iterations (`scripts/sensitivity.py`). The watershed extent is delineated at each resolution with a 30,000-cell accumulation threshold.
+
+### Basin extent by resolution
+
+![Overlap of watershed extents delineated at 1, 3, 10, and 30 m resolution](sensitivity_7/clay-center_basin_overlap.png)
+
+### Seed-averaged depth by resolution
+
+Mean water depth across the 10 seeds at the final output step of each run (walker density 2). Coarser grids finish at slightly different steps, so the 10 m map shows step 119.
 
 | 1 m | 3 m | 10 m | 30 m
 | --- | --- | ---  | ---
-| [![sensitivity_7/clay-center_depth_1_2_s_120_average.png](sensitivity_7/clay-center_depth_1_2_s_120_average.png)](sensitivity_7/clay-center_depth_1_2_s_120_average.png) | [![sensitivity_7/clay-center_depth_3_2_s_120_average.png](sensitivity_7/clay-center_depth_3_2_s_120_average.png)](sensitivity_7/clay-center_depth_3_2_s_120_average.png) | [![sensitivity_7/clay-center_depth_10_2_s_119_average.png](sensitivity_7/clay-center_depth_10_2_s_119_average.png)](sensitivity_7/clay-center_depth_10_2_s_119_average.png) | [![sensitivity_7/clay-center_depth_30_2_s_120_average.png](sensitivity_7/clay-center_depth_30_2_s_120_average.png)](sensitivity_7/clay-center_depth_30_2_s_120_average.png) |
+| ![Seed-averaged depth, 1 m](sensitivity_7/clay-center_depth_1_2_s_120_average.png) | ![Seed-averaged depth, 3 m](sensitivity_7/clay-center_depth_3_2_s_120_average.png) | ![Seed-averaged depth, 10 m](sensitivity_7/clay-center_depth_10_2_s_119_average.png) | ![Seed-averaged depth, 30 m](sensitivity_7/clay-center_depth_30_2_s_120_average.png) |
