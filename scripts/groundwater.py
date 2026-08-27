@@ -46,9 +46,7 @@ def simwe_to_strds(
     return strds_output
 
 
-def ground_water_seepage(
-    flow_accum: str, output_streams: str, threshold: int = 150
-):  # noqa: E501
+def ground_water_seepage(flow_accum: str, output_streams: str, threshold: int = 150):  # noqa: E501
     """
     Adds baseflow to streams,
     needs to be run until it reaches steady state
@@ -99,9 +97,7 @@ def sim_ground_water_seepage(
     _streams = streams
     # Add rain to the baseflow to streams
     if rain_loaded_streams:
-        gs.mapcalc(
-            f"{rain_loaded_streams} = {rain} + {streams}", overwrite=True
-        )  # noqa: E501
+        gs.mapcalc(f"{rain_loaded_streams} = {rain} + {streams}", overwrite=True)  # noqa: E501
         _streams = rain_loaded_streams
 
     gs.run_command(
@@ -133,9 +129,7 @@ def generate_plots(n_rows, n_cols, plot_params, figure_name):
         ax.set_axis_off()
         img = Image.open(params["filename"])
         plt.imshow(img)
-        ax.set_title(
-            params["rast_map"], {"fontsize": 24, "fontweight": "bold"}
-        )  # noqa: E501
+        ax.set_title(params["rast_map"], {"fontsize": 24, "fontweight": "bold"})  # noqa: E501
 
         # Add section title for each row
         if i % n_cols == 0:
@@ -162,9 +156,7 @@ def create_model_run(output_dir, site, mapset, search_pattern, title):
 
     pattern = search_pattern
     data_list = (
-        gs.read_command(
-            "g.list", type="raster", pattern=pattern, separator="comma"
-        )  # noqa: E501
+        gs.read_command("g.list", type="raster", pattern=pattern, separator="comma")  # noqa: E501
         .strip()
         .split(",")
     )
@@ -176,9 +168,7 @@ def create_model_run(output_dir, site, mapset, search_pattern, title):
         map_name = i
         filename = os.path.join(output_dir, f"{i.replace('.', '_')}.png")
         gj.init(gisdb, site, mapset)
-        map_obj = gj.Map(
-            filename=filename, use_region=True, height=600, width=600
-        )  # noqa: E501
+        map_obj = gj.Map(filename=filename, use_region=True, height=600, width=600)  # noqa: E501
         # map_obj.d_rast(map=map_name)
         _map_name = f"{map_name}@{mapset}"
         map_obj.d_shade(color=_map_name, shade="hillshade")
@@ -264,23 +254,19 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution, naip = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")[:4]
                 print(f"Project Name: {project_name}/{PROJECT_MAPSET}")
                 # Initialize the GRASS session
                 try:
                     gs.setup.init(gisdb, project_name, "PERMANENT")
-                    gs.run_command(
-                        "g.mapset", mapset=PROJECT_MAPSET, flags="c"
-                    )  # noqa: E501
+                    gs.run_command("g.mapset", mapset=PROJECT_MAPSET, flags="c")  # noqa: E501
                 except Exception as e:
                     print(f"Error: {e}")
                     exit(1)
 
                 print(f"Setting Region: res={resolution}")
 
-                gs.run_command(
-                    "g.region", raster=elevation, res=resolution, flags="ap"
-                )  # noqa: E501
+                gs.run_command("g.region", raster=elevation, res=resolution, flags="ap")  # noqa: E501
 
                 print("Calculating partial derivatives")
                 gs.run_command(
@@ -425,9 +411,7 @@ if __name__ == "__main__":
 
     # Ask GRASS GIS where its Python packages are.
     sys.path.append(
-        subprocess.check_output(
-            ["grass", "--config", "python_path"], text=True
-        ).strip()  # noqa: E501
+        subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()  # noqa: E501
     )
 
     import grass.script as gs

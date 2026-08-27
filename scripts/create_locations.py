@@ -11,7 +11,7 @@ def main():
     with open("site-CRS-info.txt", "r") as file:
         data = file.readlines()
         for line in data:
-            location_name, projcrs, res, naip_year = line.split(":")
+            location_name, projcrs, res, naip_year = line.split(":")[:4]
 
             # Check if location name and PROJCRS were found
             if location_name is None:

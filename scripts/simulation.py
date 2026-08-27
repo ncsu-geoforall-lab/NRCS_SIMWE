@@ -8,6 +8,10 @@ import subprocess
 BASE_URL = "https://github.com/ncss-tech/SIMWE-coordination/raw/main/sites/"
 PROJECT_MAPSET = "basic60"
 
+RAIN_PER_MM_HR = 50  # mm/hr
+RAIN_INTENSITY_IN_HR = 4.34  # inches per hour
+RAIN_DURATION_MIN = 46.97  # minutes
+
 
 # Define main function
 def main():
@@ -16,7 +20,7 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution, naip = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")[:4]
                 print(f"Project Name: {project_name}")
                 # Initialize the GRASS session
                 gs.setup.init(gisdb, project_name, PROJECT_MAPSET)
@@ -25,6 +29,72 @@ def main():
                 simulate(project_name, elevation_data)
             except ValueError:
                 exit(1)
+
+
+def prepare_soil_data(project_name):
+    gs.run_command(
+        "r.in.ssurgo",
+        soils="soil_areas_sda",
+        hydgrp="hydgrp_sda",
+        ksat_l="ksat_l_sda",
+        ksat_r="ksat_r_sda",
+        ksat_h="ksat_h_sda",
+        mukey="mukey_sda",
+        hzdept_r=0,
+        hzdepb_r=100,
+        desgnmaster="A",
+        nprocs=30,
+    )
+
+    m = gj.Map(
+        use_region=True,
+        filename=f"../output/{project_name}/{PROJECT_MAPSET}/ksat_r_sda.png",
+    )
+    m.d_shade(shade="relief", color="ksat_r_sda")
+    m.d_legend(raster="ksat_r_sda", title="Ksat (mm/hr)", flags="db")
+    m.show()
+
+    # Curvnumber
+    gs.run_command(
+        "r.curvenumber",
+        landcover="nlcd_2024",
+        soil="hydgrp_sda",
+        landcover_source="nlcd",
+        output="curvenumber",
+    )
+
+    # Watershed analysis
+    gs.run_command(
+        "r.watershed",
+        elevation="elevation",
+        drainage="flow_direction",
+        accumulation="accumulation",
+        stream="stream",
+        basin="basins",
+        threshold=10,
+    )
+
+    # Time of concentration
+    gs.run_command(
+        "r.timeofconcentration",
+        elevation="elevation",
+        direction="flow_direction",
+        stream="stream",
+        length_min=100,  # minimum length of flow path
+        tc="time_concentration",
+    )
+
+    intensity_mm_hr = RAIN_INTENSITY_IN_HR * 25.4
+    duration_hr = RAIN_DURATION_MIN / 60.0
+    rain_mm = intensity_mm_hr * duration_hr
+
+    print(f"Storm duration: {duration_hr:.4f} hr")
+    print(f"Rainfall intensity: {intensity_mm_hr:.3f} mm/hr")
+    print(f"Rain depth: {rain_mm:.3f} mm")
+    gs.run_command(
+        "r.mapcalc",
+        expression=f"rain = {rain_mm}",  # mm of precipitation
+    )
 
 
 def simulate(project_name, elevation_data):
@@ -153,12 +223,11 @@ if __name__ == "__main__":
 
     # Ask GRASS GIS where its Python packages are.
     sys.path.append(
-        subprocess.check_output(
-            ["grass", "--config", "python_path"], text=True
-        ).strip()  # noqa: E501
+        subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()  # noqa: E501
     )
 
     import grass.script as gs
+    import grass.jupyter as gj
 
     # Execute the main function
     sys.exit(main())

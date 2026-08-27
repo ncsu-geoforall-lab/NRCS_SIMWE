@@ -12,7 +12,7 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution, naip = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")[:4]
                 print(f"Project Name: {project_name}")
                 # Initialize the GRASS session
                 gs.setup.init(gisdb, project_name, "PERMANENT")
@@ -92,9 +92,7 @@ if __name__ == "__main__":
 
     # Ask GRASS GIS where its Python packages are.
     sys.path.append(
-        subprocess.check_output(
-            ["grass", "--config", "python_path"], text=True
-        ).strip()  # noqa: E501
+        subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()  # noqa: E501
     )
 
     import grass.script as gs

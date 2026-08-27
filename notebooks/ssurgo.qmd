@@ -190,6 +190,50 @@ tools.r_in_ssurgo(
 )
 ```
 
+```{python}
+# | label: import_ssurgo_sda
+# | eval: false
+tools.r_in_ssurgo(
+    ssurgo_path="data/gSSURGO_NC.zip",
+    soils="soil_areas",
+    hydgrp="hydgrp",
+    ksat_l="ksat_l",
+    ksat_r="ksat_r",
+    ksat_h="ksat_h",
+    mukey="mukey",
+    hzdept_r=0,
+    hzdepb_r=100,
+    desgnmaster="A",
+    flags="s",
+    nprocs=30
+)
+
+tools.r_in_ssurgo(
+    ssurgo_path="data/gSSURGO_NC.zip",
+    soils="soil_areas",
+    hydgrp="hydgrp",
+    ksat_r="ksat_r",
+    depths="0,15,30,60,100",
+    desgnmaster="A",
+    flags="s",
+    nprocs=30
+)
+```
+
+```{python}
+import grass.script.array as garray
+import matplotlib.pyplot as plt
+
+a = garray.array3d(mapname="ksat_r")  # shape (z, y, x)
+fig, axes = plt.subplots(1, a.shape[0],
+figsize=(4*a.shape[0], 4))
+for i, ax in enumerate(axes):
+    ax.imshow(a[i], cmap="viridis")
+    ax.set_title(f"ksat_r slice {i}")
+plt.show()
+```
+
+
 ## Visualize Imported Data
 
 Before feeding the soil surfaces into hydrologic models, it's worth confirming the imports look right. The soil polygons (`soil_areas_sda`) carry the full SSURGO attribute table -- MUKEY, component percentages, hydrologic group, texture, and permeability by horizon -- while the companion rasters are pre-rendered MUKEY, HSG, and three $K_{sat}$ percentiles (low / representative / high) for fast map algebra.
@@ -218,6 +262,16 @@ with gs.RegionManager(raster="mukey_sda", flags="a"):
         flags="n",
     )
     m.show()
+```
+
+```{python}
+data_json = tools.db_select(
+    table="soil_areas",
+    format="json",
+).json
+print(data_json)
+df_soils = pd.DataFrame(data_json['records'])
+df_soils.head()
 ```
 
 ### Ksat Maps
@@ -280,17 +334,6 @@ for ksat_map, out in zip(
             flags="n",
             range=[0.0, ksat_max],
         )
-        # m.d_barscale(
-        #     at=(67, 5),
-        #     font="Fira Sans Condensed Light",
-        #     fontsize=11,
-        #     length=2,
-        #     units="kilometers",
-        #     width_scale=1,
-        #     bgcolor="none",
-        #     color="#4f4e4e",
-        #     flags="n",
-        # )
         m.show()
 ```
 

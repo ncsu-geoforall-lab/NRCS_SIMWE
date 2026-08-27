@@ -15,7 +15,7 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution, naip = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")[:4]
                 print(f"Project Name: {project_name}")
                 # Initialize the GRASS session
                 gs.setup.init(gisdb, project_name, "PERMANENT")

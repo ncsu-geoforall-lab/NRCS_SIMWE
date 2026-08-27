@@ -306,7 +306,7 @@ def main():
         data = file.readlines()
         for line in data:
             try:
-                project_name, projcrs, resolution, naip = line.split(":")
+                project_name, projcrs, resolution, naip = line.split(":")[:4]
                 if project_name != "coweeta":
                     continue
                 print(f"Project Name: {project_name}")
