@@ -303,7 +303,7 @@ All simulatation are run at $1 m$ resolution:
 
 <!-- ### 1_*_*_stats
 
-![Clay-Center Max Raster](output/depth_sum_1_*_*_stats_max_raster.gif) -->
+![Clay-Center Max Raster](output/depth_sum_1_all_all_stats_max_raster.gif) -->
 
 ### 10 Seeds
 
@@ -311,11 +311,11 @@ In this figure the output maximum depth rasters were created using `r.series` fi
 where 1 represents `1` meter spatial resolution, the particle density is `1`, so the number of paritcles is equal to the number of cells, and `*` is a wildcard for the seed that was used when executing `r.sim.water`.
 
 
-![Clay-Center Max Raster 2](output/depth_sum_1_1_*_stats_max_raster.gif)
+![Clay-Center Max Raster 2](output/depth_sum_1_1_all_stats_max_raster.gif)
 *Maximum Depth Output Variablity via Gaussian Path Sampling*
 
 ### Variablility based on Particle Density
 
 Here the the outputs are all from the same seed with varibale particle density (`1_*_1`)
 
-![Clay-Center Max Raster 3](output/depth_sum_1_*_1_stats_max_raster.gif)
+![Clay-Center Max Raster 3](output/depth_sum_1_all_1_stats_max_raster.gif)
