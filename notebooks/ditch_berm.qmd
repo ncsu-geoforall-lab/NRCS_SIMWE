@@ -1,0 +1,431 @@
+---
+title: "Does SIMWE hold water behind a terrace ridge?"
+jupyter: python3
+author:
+  - name: Vaclav Petras
+    orcid: 0000-0001-5566-9236
+    affiliations:
+      - name: Center for Geospatial Analytics at NC State University
+date: 2026-09-29
+description: "SIMWE (r.sim.water) does not store water behind a terrace ridge: water starts crossing when the channel depth reaches the hmax setting, whatever the ridge height, long before a sealed terrace would spill."
+image: output/ditch_berm.png
+execute:
+  freeze: auto
+format:
+  html:
+    toc: true
+    code-tools: true
+    code-copy: true
+    code-fold: true
+    lightbox: true
+---
+
+```{python}
+#| label: setup
+#| output: false
+import atexit
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from IPython.display import display
+
+# Ask GRASS where its Python packages are (grass must be on PATH).
+sys.path.append(
+    subprocess.check_output(["grass", "--config", "python_path"], text=True).strip()
+)
+import grass.script as gs
+from grass.tools import Tools
+
+notebook_start = time.perf_counter()
+
+RAIN = 100  # mm/hr, upper slope only
+DURATION = 120  # min
+OUTPUT_STEP = 2  # min between maps
+DOMAIN = 120  # m across the slope
+BAND = 20  # m, central strip across the slope used for all model numbers
+RIDGES = [0.1, 0.25, 0.4, 0.5]  # ridge height above the level strip [m]
+HMAXS = [0.1, 0.3, 0.5]  # r.sim.water hmax [m]; 0.3 is the default
+SEEDS = [42, 43, 44]
+DEFAULT_RIDGE, DEFAULT_HMAX = 0.25, 0.3
+OTHER = {"hbeta": 0.5, "halpha": 4, "diffusion_coeff": 0.8}  # r.sim.water defaults
+MANNING = 0.1
+WALKERS_PER_RAIN_CELL = 25
+PASS_DEPTH = 0.001  # m of water just past the ridge that counts as crossing
+SOURCE_COMMIT = "40fee68d559c9fc884178e75811885bfb066a7ca"  # GRASS sources built
+
+v = SimpleNamespace()  # formatted values quoted in the text
+```
+
+```{python}
+#| label: terrace
+#| output: false
+# The terrace profile, west to east, 1 m cells; elevation falls eastward.
+UPPER, STRIP, CHANNEL_W, RIDGE_W, LOWER = 20, 10, 3, 3, 20  # m
+SLOPE = 0.05  # upper and lower slope
+CHANNEL_DEPTH = 0.25  # m below the level strip
+Z0 = 10.0  # elevation of the level strip [m]
+X1 = UPPER  # end of the upper slope
+X2 = X1 + STRIP  # start of the channel
+X3 = X2 + CHANNEL_W  # start of the ridge
+X4 = X3 + RIDGE_W  # start of the lower slope
+LENGTH = X4 + LOWER
+x = np.arange(LENGTH) + 0.5  # cell centres
+CHANNEL = (x >= X2) & (x < X3)
+PAST = (x >= X4) & (x < X4 + 2)  # the first 2 m past the ridge
+ROWS = slice(DOMAIN // 2 - BAND // 2, DOMAIN // 2 + BAND // 2)
+# Rain running onto the terrace per metre along it [m2/s], with the model's own
+# mm/hr conversion (simlib/input.c), so the crossing rate compares like with like.
+INFLOW = RAIN * 0.000000278 * UPPER
+
+
+def terrain(ridge):
+    """Elevation at the cell centres."""
+    return np.select(
+        [x < X1, x < X2, x < X3, x < X4],
+        [Z0 + SLOPE * (X1 - x), Z0, Z0 - CHANNEL_DEPTH, Z0 + ridge],
+        Z0 - SLOPE * (x - X4),
+    )
+
+
+def terrain_expression(name, ridge):
+    """The same profile as an r.mapcalc expression of the cell-centre easting."""
+    return (
+        f"{name} = if(x() < {X1}, {Z0} + {SLOPE} * ({X1} - x()), "
+        f"if(x() < {X2}, {Z0}, if(x() < {X3}, {Z0 - CHANNEL_DEPTH}, "
+        f"if(x() < {X4}, {Z0 + ridge}, {Z0} - {SLOPE} * (x() - {X4})))))"
+    )
+
+
+def sealed_spill_minutes(ridge):
+    """Minutes until a sealed terrace (closed ends, no infiltration) is full.
+
+    Storage per metre: the channel and the level strip filled to the ridge top
+    plus the pool backing up the upper slope; inflow: rain on the upper slope.
+    """
+    storage = CHANNEL_W * (CHANNEL_DEPTH + ridge) + STRIP * ridge + ridge**2 / (2 * SLOPE)
+    return storage / (RAIN / 3.6e6 * UPPER) / 60
+```
+
+```{python}
+#| label: grass
+#| output: false
+# A throwaway XY project, removed at the end or, if the render fails, at exit.
+tmp_dir = tempfile.mkdtemp(prefix="ditch_berm_", dir=os.environ.get("TMPDIR"))
+project = os.path.join(tmp_dir, "ditch_berm")
+gs.create_project(project)
+session = gs.setup.init(project, env=os.environ.copy())
+atexit.register(shutil.rmtree, tmp_dir, ignore_errors=True)
+tools = Tools(session=session, overwrite=True)
+tools.g_region(w=0, e=LENGTH, s=0, n=DOMAIN, res=1)
+for ridge in RIDGES:
+    tools.r_mapcalc(expression=terrain_expression(f"elev_{ridge * 100:.0f}", ridge))
+tools.r_mapcalc(expression=f"rain = if(x() < {X1}, {RAIN}, 0)")
+grass_version = tools.g_version(flags="g").keyval["version"]
+
+
+def read_profile(run_tools, name):
+    """West-east profile of a raster: the mean over the central band of rows.
+
+    Written with r.out.bin to a unique file, so runs in parallel threads do not
+    collide (grass.script.array names its temporary file after the process).
+    """
+    fd, path = tempfile.mkstemp(suffix=".bin", dir=tmp_dir)
+    os.close(fd)
+    run_tools.r_out_bin(flags="f", input=name, output=path, bytes=8, null=0)
+    data = np.fromfile(path, dtype=np.float64).reshape(DOMAIN, LENGTH)
+    os.remove(path)
+    return data[ROWS].mean(axis=0)
+
+
+def simulate(ridge, hmax, seed):
+    """One r.sim.water run with a map every OUTPUT_STEP minutes.
+
+    Returns a table with one row per map: the depth in the deepest channel
+    cell, the depth just past the ridge, and the crossing rate (discharge just
+    past the ridge over the inflow), plus the depth profiles by minute.
+    """
+    name = f"r{ridge * 100:.0f}_h{hmax * 100:.0f}_s{seed}"
+    run_tools = Tools(session=session, overwrite=True)
+    run_tools.r_sim_water(
+        elevation=f"elev_{ridge * 100:.0f}", rain="rain", depth=name,
+        discharge=f"{name}_q", man_value=MANNING, duration=DURATION,
+        nwalkers=WALKERS_PER_RAIN_CELL * UPPER * DOMAIN, random_seed=seed,
+        hmax=hmax, **OTHER, flags="t", output_step=OUTPUT_STEP, nprocs=1,
+    )
+    # A run stops writing maps once its last walker has left the domain.
+    maps = run_tools.g_list(type="raster", pattern=f"{name}.*").text.split()
+    q_maps = run_tools.g_list(type="raster", pattern=f"{name}_q.*").text.split()
+    def by_minute(names):
+        return {int(n.rsplit(".", 1)[1]): n for n in names}
+
+    depth_maps, q_maps_by_minute = by_minute(maps), by_minute(q_maps)
+    rows, profiles = [], {}
+    for minute in sorted(depth_maps):
+        depth = read_profile(run_tools, depth_maps[minute])
+        discharge = read_profile(run_tools, q_maps_by_minute[minute])  # m3/s per 1 m cell
+        profiles[minute] = depth
+        rows.append({
+            "minute": minute,
+            "deepest_channel": depth[CHANNEL].max(),
+            "past_ridge": depth[PAST].mean(),
+            "rate": discharge[PAST].mean() / INFLOW,
+        })
+    run_tools.g_remove(type="raster", name=maps + q_maps, flags="f")
+    return {"ridge": ridge, "hmax": hmax, "seed": seed,
+            "series": pd.DataFrame(rows), "profiles": profiles}
+```
+
+```{python}
+#| label: runs
+#| output: false
+start = time.perf_counter()
+cases = [(r, h, s) for r in RIDGES for h in HMAXS for s in SEEDS]
+with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
+    runs = list(pool.map(lambda case: simulate(*case), cases))
+wall_runs = time.perf_counter() - start
+by_key = {(r["ridge"], r["hmax"], r["seed"]): r for r in runs}
+
+
+def run_summary(run):
+    s = run["series"]
+    crossing = s.loc[s["past_ridge"] > PASS_DEPTH, "minute"]
+    onset = crossing.min() if len(crossing) else np.nan
+    reached = s.loc[s["deepest_channel"] >= 0.98 * run["hmax"], "minute"].min()
+    after = s.set_index("minute")["rate"].get(onset + 30, np.nan)
+    return {
+        "ridge_m": run["ridge"], "hmax": run["hmax"], "seed": run["seed"],
+        "spill_min": sealed_spill_minutes(run["ridge"]), "onset_min": onset,
+        "hmax_reached_min": reached, "deepest_channel_m": s["deepest_channel"].iloc[-1],
+        "rate_after_30": after, "last_map_min": s["minute"].iloc[-1],
+    }
+
+
+table = pd.DataFrame([run_summary(r) for r in runs])
+summary = (
+    table.groupby(["ridge_m", "hmax"])
+    .agg(
+        spill_min=("spill_min", "first"),
+        onset_min=("onset_min", "min"),
+        onset_max=("onset_min", "max"),
+        deepest_channel_m=("deepest_channel_m", "mean"),
+        crossing_rate_pct=("rate_after_30", lambda r: 100 * r.mean()),
+        last_map_min=("last_map_min", "min"),
+    )
+    .reset_index()
+)
+```
+
+```{python}
+#| label: key-values
+#| output: false
+def onsets(hmax):
+    return table.loc[table["hmax"] == hmax, "onset_min"]
+
+
+def one_value(values):
+    """The single value of a series, or 'lo to hi' when the seeds differ."""
+    lo, hi = values.min(), values.max()
+    return f"{lo:.0f}" if lo == hi else f"{lo:.0f} to {hi:.0f}"
+
+
+v.onset_default = one_value(onsets(DEFAULT_HMAX))
+v.onset_01 = one_value(onsets(0.1))
+v.onset_05 = one_value(onsets(0.5))
+v.spill_lo = f"{summary['spill_min'].min():.0f}"
+# Lowest ridge for which a sealed terrace holds the whole storm.
+heights = np.arange(0.0, 0.6, 0.005)
+spills = sealed_spill_minutes(heights)
+h_holds = heights[np.argmax(spills > DURATION)]
+v.h_holds = f"{h_holds:.2f}"
+v.rate_lo = f"{summary['crossing_rate_pct'].min():.0f}"
+v.rate_hi = f"{min(summary['crossing_rate_pct'].max(), 100):.0f}"
+deep_dev = (table["deepest_channel_m"] - table["hmax"]).abs()
+v.deep_dev_mm = f"{1000 * deep_dev.max():.0f}"
+v.last_map = f"{summary['last_map_min'].min():.0f}"
+```
+
+## Bottom line
+
+**SIMWE has no explicit storage behind a terrace ridge.** A real terrace stores runoff in its channel until the water reaches the ridge top and only then spills. In SIMWE, the overland flow model *r.sim.water* in GRASS, water starts crossing the ridge when the model's depth in the deepest channel cell reaches the `hmax` setting. That takes `{python} v.onset_default` minutes at the default `hmax` of 0.3 m, **whatever the ridge height**. A sealed terrace of the same shape would spill at minute `{python} v.spill_lo` with the lowest ridge (0.1 m), and with a ridge of `{python} v.h_holds` m or more it would hold the whole 120-minute storm. Changing `hmax` to 0.1 or 0.5 m moves the start to minute `{python} v.onset_01` or `{python} v.onset_05`, again the same for every ridge height tested. Once water crosses, it crosses at about the rate rain runs onto the terrace.
+
+**Scope.** Do not use SIMWE to size terraces or to judge whether a terrace holds a storm. In this model, when water gets past a ridge depends on a parameter setting, not on the terrace.
+
+## The test
+
+A synthetic field slope facing east, 1 m cells. From west to east: a 20 m upper slope at 5 %, a 10 m level strip, a 3 m wide terrace channel 0.25 m (10 in) deep, a 3 m wide ridge, and a 20 m lower slope at 5 %. The ridge top is 0.1, 0.25 (default), 0.4 or 0.5 m (4 to 20 in) above the level strip, that is 0.35 to 0.75 m (14 to 30 in) above the channel bottom, the height NRCS Code 600 uses. The figures give the height above the level strip. Rain falls at 100 mm/hr (3.9 in/hr) on the upper slope only for 120 minutes, a stress test rather than a design storm. There is no infiltration.
+
+Each case runs with `hmax` 0.1, 0.3 (the r.sim.water default) and 0.5 m, the other diffusion settings at their defaults, Manning's n 0.1, 60,000 walkers (25 per rain cell), three random seeds, and a map every 2 minutes. All model numbers are means over the central 20 m of the domain across the slope. The domain is 120 m wide because its north and south edges absorb water: in a narrower domain much of the channel water leaves sideways instead of reaching the ridge, which would be a property of the model set-up, not of the terrace.
+
+**The physical reference** is a *sealed terrace*: the same shape with closed ends and no infiltration, which fills to the ridge top and then spills. Per metre of terrace it stores the channel (3 m × (0.25 m + H)), the level strip (10 m × H) and the pool backing up the upper slope (H² / (2 × 0.05)), where H is the ridge height. It spills after that volume divided by the inflow (rain rate × 20 m). A graded terrace that drains to an outlet would spill later or not at all, so the reference is the earliest time a terrace's storage could run out.
+
+
+```{python}
+#| label: summary-table
+display(summary.round(3))
+```
+
+The table gives, for each ridge height and `hmax`, the sealed-terrace spill time, the first 2-minute map with more than 1 mm of water just past the ridge (earliest and latest of the three seeds), the depth of the deepest channel cell at the end, the crossing rate 30 minutes after water starts crossing as a percentage of the rate rain runs onto the terrace (mean of the seeds), and the earliest last map (see the caveats).
+
+
+## How SIMWE moves water past a ridge
+
+SIMWE represents runoff as many small parcels of water, called walkers. Every time step each walker drifts with the velocity of the cell it is in, which comes from the terrain slope and Manning's n only, and takes a random step. The simulated water depth never feeds back into the velocity, so water collecting in the channel does not raise a water level that pushes it over the ridge. On the flat channel bottom the velocity is zero and walkers move only by their random steps.
+
+`hmax` is a switch. Where the model's depth in a walker's cell exceeds `hmax`, the random step becomes `halpha + 1` times longer (five times at the default `halpha` of 4), and the walker moves with a remembered velocity instead of the cell's own. That remembered velocity starts as the velocity the walker had where it was born, on the upper slope, pointing toward the ridge, and is updated only above `hmax`, where it decays toward the local velocity (zero in the centre of the channel). Once the channel is deeper than `hmax`, walkers take much larger random steps and some keep a drift toward the ridge; this page does not separate which of the two carries more water across. This page describes the behaviour of GRASS at commit [`40fee68d55`](https://github.com/OSGeo/grass/commit/40fee68d559c9fc884178e75811885bfb066a7ca) (`raster/r.sim/simlib/hydro.c`, lines 237 to 279).
+
+## The channel fills to hmax, then water crosses
+
+```{python}
+#| label: fig-timing
+#| fig-cap: "Default terrace (ridge 0.25 m), seed 42, one line per hmax. Top: the model's depth in the deepest channel cell; dotted lines mark each hmax. Bottom: water crossing just past the ridge as a percentage of the rate at which rain runs onto the terrace. Grey: after the 120-minute storm; the sealed terrace would still be holding at its end (it would spill only at the dashed line if the rain went on). Lines end at each run's last map."
+colors = dict(zip(HMAXS, ["#2a78d6", "#e8643a", "#1aa37a"]))
+spill_default = sealed_spill_minutes(DEFAULT_RIDGE)
+fig, (ax_d, ax_q) = plt.subplots(2, 1, figsize=(8, 5.5), sharex=True)
+for hmax in HMAXS:
+    s = by_key[(DEFAULT_RIDGE, hmax, 42)]["series"]
+    ax_d.plot(s["minute"], s["deepest_channel"], color=colors[hmax], label=f"hmax {hmax:g} m")
+    ax_d.axhline(hmax, color=colors[hmax], linestyle=":", linewidth=0.8)
+    ax_q.plot(s["minute"], 100 * s["rate"], color=colors[hmax])
+for ax in (ax_d, ax_q):
+    ax.axvspan(DURATION, spill_default + 6, color="0.9", zorder=0)
+    ax.axvline(spill_default, color="k", linestyle="--", linewidth=0.8)
+ax_q.annotate(
+    f"sealed terrace\nspills, minute {spill_default:.0f}", (spill_default, 50),
+    xytext=(-4, 0), textcoords="offset points", ha="right", va="center", fontsize=8,
+)
+ax_d.set_ylabel("deepest channel cell [m]")
+ax_q.set_ylabel("crossing rate [% of inflow]")
+ax_q.set_xlabel("minute (model time)")
+ax_q.set_xlim(0, spill_default + 6)
+ax_q.set_ylim(0, 110)
+ax_d.legend(loc="lower right", fontsize=8)
+fig.tight_layout()
+plt.show()
+```
+
+The deepest channel cell deepens until it reaches `hmax` and then stays there. Water starts crossing the ridge at the same moment and half an hour later crosses at `{python} v.rate_lo` to `{python} v.rate_hi` % of the inflow rate (all runs). A lower `hmax` lets water across sooner and a higher one delays it; none of the settings tested makes the channel hold until it is full. Because the start depends on `hmax` and not on the terrace, the error could go either way: a large enough `hmax` would hold a low terrace longer than a real one. The deepest channel cell ends within `{python} v.deep_dev_mm` mm of `hmax` in every run, so `hmax` acts as a cap on the ponded depth.
+
+## The ridge height does not matter; hmax does
+
+```{python}
+#| label: fig-ridge
+#| fig-cap: "When water starts crossing (first 2-minute map with more than 1 mm just past the ridge) against the ridge height, for each hmax; bars span the three seeds. Black: when a sealed terrace of the same shape would spill. Grey: after the end of the 120-minute storm."
+fig, ax = plt.subplots(figsize=(7, 4.2))
+h = np.linspace(0.05, 0.55, 101)
+ax.axhspan(DURATION, 320, color="0.9", zorder=0)
+ax.plot(h, sealed_spill_minutes(h), color="k", label="sealed terrace spills")
+for hmax in HMAXS:
+    s = summary[summary["hmax"] == hmax]
+    mid = (s["onset_min"] + s["onset_max"]) / 2
+    ax.errorbar(
+        s["ridge_m"], mid, yerr=(mid - s["onset_min"], s["onset_max"] - mid),
+        color=colors[hmax], marker="o", capsize=3, label=f"SIMWE, hmax {hmax:g} m",
+    )
+ax.text(0.06, DURATION + 6, "after the storm", fontsize=8, color="0.3")
+ax.set_xlabel("ridge height above the level strip [m]")
+ax.set_ylabel("minute water starts crossing")
+ax.set_xlim(0.05, 0.55)
+ax.set_ylim(0, 320)
+secondary = ax.secondary_xaxis("top", functions=(lambda m: m / 0.0254, lambda i: i * 0.0254))
+secondary.set_xlabel("ridge height [in]")
+ax.legend(loc="upper left", fontsize=8)
+fig.tight_layout()
+fig.savefig("output/ditch_berm.png", dpi=150)
+plt.show()
+```
+
+A real terrace with a higher ridge holds more and spills later: at minute `{python} v.spill_lo` with a 0.1 m ridge, while with `{python} v.h_holds` m or more it holds the whole storm (the black line above the grey edge shows when it would spill if the rain went on). In SIMWE the start of crossing is flat across ridge heights and moves only with `hmax`. In every run the model passes water before the sealed terrace would spill.
+
+## What it looks like at the ridge
+
+```{python}
+#| label: fig-profile
+#| fig-cap: "Default terrace and settings, seed 42, minute 60. Top: terrain and the model's water surface at true depth (the vertical axis is stretched), with the ridge crest. Bottom: depth in mm (logarithmic above 1 mm). The model has no water level, so the channel water concentrates in the centre cell instead of lying flat; a thin film already covers the ridge and the lower slope."
+depth = by_key[(DEFAULT_RIDGE, DEFAULT_HMAX, 42)]["profiles"][60]
+z = terrain(DEFAULT_RIDGE)
+fig, (ax_z, ax_h) = plt.subplots(
+    2, 1, figsize=(9, 5), sharex=True, gridspec_kw={"height_ratios": (3, 2)}
+)
+ax_z.fill_between(x, z.min() - 0.3, z, step="mid", color="#e6dccb")
+ax_z.step(x, z, where="mid", color="#6b5a45", label="terrain")
+ax_z.fill_between(x, z, z + depth, step="mid", color="#2a78d6", alpha=0.6)
+ax_z.step(x, z + depth, where="mid", color="#12467f", linewidth=0.8, label="water surface")
+ax_z.axhline(Z0 + DEFAULT_RIDGE, color="k", linestyle="--", linewidth=0.8, label="ridge crest")
+ax_z.axvspan(0, X1, color="#2a78d6", alpha=0.08, label=f"rain {RAIN} mm/hr")
+for name, a, b in [("upper slope", 0, X1), ("level strip", X1, X2), ("channel", X2, X3),
+                   ("ridge", X3, X4), ("lower slope", X4, LENGTH)]:
+    ax_z.text((a + b) / 2, z.max() + 0.1, name, ha="center", fontsize=8, color="0.3")
+ax_z.set_ylim(z.min() - 0.3, z.max() + 0.3)
+ax_z.set_ylabel("elevation [m]")
+ax_z.legend(loc="lower left", fontsize=8)
+ax_h.step(x, 1000 * depth, where="mid", color="#12467f")
+ax_h.axhline(1000 * PASS_DEPTH, color="0.3", linestyle=":", linewidth=0.8)
+ax_h.text(LENGTH - 1, 1.3, "1 mm", ha="right", fontsize=8, color="0.3")
+ax_h.set_yscale("symlog", linthresh=1)
+ax_h.set_ylim(0, 2 * 1000 * depth.max())
+ax_h.set_ylabel("depth [mm]")
+ax_h.set_xlabel("distance east [m]")
+ax_h.set_xlim(0, LENGTH)
+fig.tight_layout()
+plt.show()
+```
+
+## What this means
+
+- SIMWE shows where runoff goes on a terraced field, but not whether or when a terrace overtops. The time water gets past a ridge is set by `hmax`, which has no physical counterpart in the terrace.
+- Raising `hmax` does not fix this; it delays crossing and lets the channel look deeper, still independent of the ridge.
+- For studies of terraced fields, treat the terrace as something that changes flow paths in the model, and judge its storage with an engineering calculation instead.
+
+## Caveats
+
+- **Model time.** SIMWE releases all walkers at the start and builds the depth up as they move. That equals continuous rain only for a linear model, and the `hmax` switch makes the model nonlinear, so minutes here are on the model's time axis, not a hydrograph. Runs stop writing maps when their last walker has left the domain; the earliest last map is minute `{python} v.last_map`.
+- **The depth is an estimate** built from how long walkers stay in a cell, not a water level; it can exceed the ridge height without meaning the water surface is above the crest.
+- **A synthetic terrace.** The profile is a stand-in for a realistic terrace profile. The domain has absorbing edges, and the crossing rate slightly below 100 % reflects water leaving there.
+
+## Acknowledgements
+
+This work was supported by the U.S. Department of Agriculture, Natural Resources Conservation Service (NRCS) under cooperative agreement NR233A750023C043.
+
+## References
+
+- Mitas, L., and Mitasova, H., 1998, Distributed soil erosion simulation for effective erosion prevention. Water Resources Research, 34(3), 505-516.
+- *r.sim.water* manual: <https://grass.osgeo.org/grass-devel/manuals/r.sim.water.html>
+- NRCS Conservation Practice Standard Terrace (Code 600).
+
+## Reproducibility
+
+```{python}
+#| label: claims-check
+# Every statement in the text, checked against the runs.
+for hmax in HMAXS:
+    assert onsets(hmax).notna().all(), f"hmax {hmax}: some runs never passed water"
+    per_ridge = table[table["hmax"] == hmax].groupby("ridge_m")["onset_min"].median()
+    assert per_ridge.max() - per_ridge.min() <= OUTPUT_STEP, f"hmax {hmax}: onset depends on ridge"
+assert onsets(0.1).max() < onsets(0.3).min() and onsets(0.3).max() < onsets(0.5).min()
+assert (table["onset_min"] < table["spill_min"]).all(), "a run passed after the spill"
+assert (table["onset_min"] - table["hmax_reached_min"]).abs().max() <= OUTPUT_STEP, (
+    "crossing does not start when the channel reaches hmax"
+)
+assert int(v.deep_dev_mm) <= 10, "deepest channel cell does not settle at hmax"
+assert table["rate_after_30"].notna().all(), "a run ended within 30 min of its onset"
+assert summary["crossing_rate_pct"].min() > 90, "crossing rate below 90 % of inflow"
+assert (spills[heights >= h_holds] > DURATION).all()
+assert spills[heights < h_holds].max() <= DURATION
+print("all claims hold")
+print(f"{len(runs)} runs in {wall_runs:.0f} s on {os.cpu_count()} cores; "
+      f"notebook {time.perf_counter() - notebook_start:.0f} s")
+print(f"GRASS {grass_version}, sources at commit {SOURCE_COMMIT}")
+session.finish()
+shutil.rmtree(tmp_dir, ignore_errors=True)
+```
+
+The runs use fixed seeds with one thread each (`nprocs=1`), so a re-render reproduces them.
